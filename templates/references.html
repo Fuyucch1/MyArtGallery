@@ -60,17 +60,17 @@
 {% if references %}
     {% for category, subcategories in references.items() %}
     <div class="reference-category" data-category="{{ category }}">
-        <h2>{{ category }} <i class="fas fa-chevron-down fold-arrow"></i></h2>
+        <h2>{{ category }} {% if category.strip() %}<i class="fas fa-chevron-down fold-arrow"></i>{% endif %}</h2>
 
         {% for subcategory, refs in subcategories.items() %}
         <div class="reference-subcategory" data-subcategory="{{ subcategory }}">
-            <h3>{{ subcategory }} <i class="fas fa-chevron-down fold-arrow"></i></h3>
+            <h3>{{ subcategory }} {% if subcategory.strip() %}<i class="fas fa-chevron-down fold-arrow"></i>{% endif %}</h3>
 
             <div class="reference-grid">
                 {% for ref in refs %}
                 <div class="reference-item" data-id="{{ ref.id }}" data-category="{{ ref.category }}" data-subcategory="{{ ref.subcategory }}">
-                    <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" class="reference-image">
                     <div class="reference-name">{{ ref.name if ref.name else (ref.filename.split('_', 1)[1] if '_' in ref.filename else ref.filename) }}</div>
+                    <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" class="reference-image">
                     <div class="reference-actions">
                         <div class="action-icons">
                             <a href="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" download class="icon-btn download-icon" title="Download">

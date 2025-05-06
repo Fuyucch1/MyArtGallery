@@ -706,12 +706,12 @@ footer {
 }
 
 .reference-name {
-    margin-top: 10px;
+    margin-bottom: 10px;
     font-weight: bold;
     color: var(--accent-color);
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
     padding: 0 5px;
 }
 

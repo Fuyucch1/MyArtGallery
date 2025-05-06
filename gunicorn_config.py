@@ -1,7 +1,7 @@
 # Gunicorn configuration file
-import multiprocessing
+from app import app
 
-# Bind to port 8000 on all available network interfaces
+# Bind to port 8000
 bind = "127.0.0.1:8000"
 
 # Number of worker processes
