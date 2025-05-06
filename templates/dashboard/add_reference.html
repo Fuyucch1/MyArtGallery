@@ -1,0 +1,136 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Add Reference{% endblock %}
+
+{% block content %}
+<h1>Add New Reference</h1>
+<p>Upload a new reference image.</p>
+
+<div class="dashboard-actions">
+    <a href="{{ url_for('dashboard_references') }}" class="btn">Back to References</a>
+</div>
+
+<form method="POST" action="{{ url_for('dashboard_add_reference') }}" enctype="multipart/form-data">
+    <div class="form-group">
+        <label for="file">Image File:</label>
+        <input type="file" id="file" name="file" class="form-control" accept="image/*" required>
+    </div>
+
+    <div class="form-group">
+        <label for="name">Reference Name:</label>
+        <input type="text" id="name" name="name" class="form-control" placeholder="Enter a name for this reference">
+        <small>If left blank, the filename will be used.</small>
+    </div>
+
+    <div class="form-group">
+        <label for="category-select">Category:</label>
+        <select id="category-select" class="form-control" onchange="toggleCategoryInput()">
+            <option value="">Select a category</option>
+            {% for category in categories %}
+            <option value="{{ category }}">{{ category }}</option>
+            {% endfor %}
+            <option value="other">Other (create new)</option>
+        </select>
+        <div id="new-category-container" style="display: none; margin-top: 10px;">
+            <input type="text" id="category" name="category" class="form-control" placeholder="Enter new category" required>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="subcategory-select">Subcategory:</label>
+        <select id="subcategory-select" class="form-control" onchange="toggleSubcategoryInput()">
+            <option value="">Select a subcategory</option>
+            {% for folder in folders %}
+            <option value="{{ folder }}">{{ folder }}</option>
+            {% endfor %}
+            <option value="other">Other (create new)</option>
+        </select>
+        <div id="new-subcategory-container" style="display: none; margin-top: 10px;">
+            <input type="text" id="subcategory" name="subcategory" class="form-control" placeholder="Enter new subcategory" required>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description:</label>
+        <textarea id="description" name="description" class="form-control" rows="3" placeholder="Enter a description for this reference..."></textarea>
+    </div>
+
+    <div class="form-group">
+        <label>
+            <input type="checkbox" id="public" name="public" checked>
+            Public (visible to everyone)
+        </label>
+    </div>
+
+    <div class="form-group">
+        <label>
+            <input type="checkbox" id="watermark" name="watermark" onchange="toggleWatermarkText()">
+            Add AI-unfriendly watermark
+        </label>
+    </div>
+
+    <div class="form-group" id="watermark-text-container" style="display: none;">
+        <label for="watermark_text">Watermark Text:</label>
+        <input type="text" id="watermark_text" name="watermark_text" class="form-control" placeholder="Enter text for the watermark">
+        <small>Leave blank to use the default text: "DO NOT USE FOR AI TRAINING"</small>
+    </div>
+
+    <div class="form-group">
+        <button type="submit" class="btn">Upload Reference</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleCategoryInput() {
+        const select = document.getElementById('category-select');
+        const container = document.getElementById('new-category-container');
+        const input = document.getElementById('category');
+
+        if (select.value === 'other') {
+            container.style.display = 'block';
+            input.required = true;
+            input.value = '';
+        } else {
+            container.style.display = 'none';
+            input.required = false;
+            input.value = select.value;
+        }
+    }
+
+    function toggleSubcategoryInput() {
+        const select = document.getElementById('subcategory-select');
+        const container = document.getElementById('new-subcategory-container');
+        const input = document.getElementById('subcategory');
+
+        if (select.value === 'other') {
+            container.style.display = 'block';
+            input.required = true;
+            input.value = '';
+        } else {
+            container.style.display = 'none';
+            input.required = false;
+            input.value = select.value;
+        }
+    }
+
+    function toggleWatermarkText() {
+        const checkbox = document.getElementById('watermark');
+        const container = document.getElementById('watermark-text-container');
+
+        if (checkbox.checked) {
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleCategoryInput();
+        toggleSubcategoryInput();
+        toggleWatermarkText(); // Initialize watermark text visibility
+    });
+</script>
+{% endblock %}

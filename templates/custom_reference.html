@@ -1,0 +1,324 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - {{ custom_ref.name }}{% endblock %}
+
+{% block content %}
+<div class="modern-page-header">
+    <h1>{{ custom_ref.name }}</h1>
+    <p>This custom collection has been created on {{ custom_ref.creation_date.strftime('%Y-%m-%d') }}.</p>
+</div>
+
+<div class="custom-ref-info">
+    <p>Share this link with artists: <code>{{ request.url }}</code> <button id="copy-link" class="btn">Copy Link</button></p>
+    <div class="selected-refs">
+        <p>Selected references: <span id="selected-count">0</span></p>
+    </div>
+</div>
+
+
+<div class="download-all-container">
+    <button id="download-all-btn" class="btn">Download All Images</button>
+    <button id="download-selected-btn" class="btn">Download Selected Images</button>
+</div>
+
+{% if references %}
+    {% set organized_refs = {} %}
+    {% for ref in references %}
+        {% if ref.category not in organized_refs %}
+            {% set _ = organized_refs.update({ref.category: {}}) %}
+        {% endif %}
+        {% if ref.subcategory not in organized_refs[ref.category] %}
+            {% set _ = organized_refs[ref.category].update({ref.subcategory: []}) %}
+        {% endif %}
+        {% set _ = organized_refs[ref.category][ref.subcategory].append(ref) %}
+    {% endfor %}
+
+    {% for category, subcategories in organized_refs.items() %}
+    <div class="reference-category" data-category="{{ category }}">
+        <h2>{{ category }} <i class="fas fa-chevron-down fold-arrow"></i></h2>
+
+        {% for subcategory, refs in subcategories.items() %}
+        <div class="reference-subcategory" data-subcategory="{{ subcategory }}">
+            <h3>{{ subcategory }} <i class="fas fa-chevron-down fold-arrow"></i></h3>
+
+            <div class="reference-grid">
+                {% for ref in refs %}
+                <div class="reference-item" data-id="{{ ref.id }}" data-category="{{ ref.category }}" data-subcategory="{{ ref.subcategory }}">
+                    <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" class="reference-image">
+                    <div class="reference-name">{{ ref.name if ref.name else (ref.filename.split('_', 1)[1] if '_' in ref.filename else ref.filename) }}</div>
+                    <div class="reference-actions">
+                        <div class="action-icons">
+                            <a href="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" download class="icon-btn download-icon" title="Download">
+                                <i class="fas fa-download"></i>
+                            </a>
+                        </div>
+                        <div class="select-checkbox">
+                            <label class="ref-checkbox">
+                                <input type="checkbox" name="references" value="{{ ref.id }}" class="ref-select">
+                                <span class="checkbox-label">Select</span>
+                            </label>
+                        </div>
+                    </div>
+                    {% if ref.description %}
+                    <div class="reference-description" style="display: none;">{{ ref.description }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+{% else %}
+    <p>No references available in this custom reference.</p>
+{% endif %}
+
+<!-- Reference Modal -->
+<div id="reference-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <div class="modal-body">
+            <div class="modal-image-container">
+                <img id="modal-image" src="" alt="Reference">
+            </div>
+            <div class="modal-details">
+                <h2 id="modal-name"></h2>
+                <h3 id="modal-category-subcategory"></h3>
+                <p id="modal-description"></p>
+                <p id="modal-upload-date"></p>
+                <div class="modal-actions">
+                    <a id="modal-download" href="" download class="btn">Download Image</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="back-link">
+    <a href="{{ url_for('references') }}" class="btn">Back to All References</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Fold/unfold categories and subcategories
+        const categoryHeaders = document.querySelectorAll('.reference-category h2');
+        const subcategoryHeaders = document.querySelectorAll('.reference-subcategory h3');
+
+        // Toggle category content
+        categoryHeaders.forEach(header => {
+            header.addEventListener('click', function() {
+                const category = this.closest('.reference-category');
+                const subcategories = category.querySelectorAll('.reference-subcategory');
+                const arrow = this.querySelector('.fold-arrow');
+
+                // Toggle visibility of all subcategories in this category
+                subcategories.forEach(subcategory => {
+                    subcategory.style.display = subcategory.style.display === 'none' ? '' : 'none';
+                });
+
+                // Toggle arrow direction
+                arrow.classList.toggle('collapsed');
+            });
+        });
+
+        // Toggle subcategory content
+        subcategoryHeaders.forEach(header => {
+            header.addEventListener('click', function(e) {
+                // Prevent event from bubbling up to category header
+                e.stopPropagation();
+
+                const subcategory = this.closest('.reference-subcategory');
+                const grid = subcategory.querySelector('.reference-grid');
+                const arrow = this.querySelector('.fold-arrow');
+
+                // Toggle visibility of the reference grid
+                grid.style.display = grid.style.display === 'none' ? '' : 'none';
+
+                // Toggle arrow direction
+                arrow.classList.toggle('collapsed');
+            });
+        });
+
+        // Copy link functionality
+        const copyButton = document.getElementById('copy-link');
+
+        if (copyButton) {
+            copyButton.addEventListener('click', function() {
+                const url = '{{ request.url }}';
+
+                // Create a temporary input element
+                const tempInput = document.createElement('input');
+                tempInput.value = url;
+                document.body.appendChild(tempInput);
+
+                // Select and copy the text
+                tempInput.select();
+                document.execCommand('copy');
+
+                // Remove the temporary element
+                document.body.removeChild(tempInput);
+
+                // Update button text temporarily
+                const originalText = copyButton.textContent;
+                copyButton.textContent = 'Copied!';
+
+                setTimeout(function() {
+                    copyButton.textContent = originalText;
+                }, 2000);
+            });
+        }
+
+        // Selected references count
+        const checkboxes = document.querySelectorAll('.ref-select');
+        const selectedCount = document.getElementById('selected-count');
+
+        // Update selected count
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.ref-select:checked').length;
+            if (selectedCount) {
+                selectedCount.textContent = count;
+            }
+        }
+
+        // Add event listeners to checkboxes for selected count
+        checkboxes.forEach(function(checkbox) {
+            checkbox.addEventListener('change', updateSelectedCount);
+        });
+
+        // Initialize selected count
+        updateSelectedCount();
+
+        // Download selected images functionality
+        const downloadSelectedBtn = document.getElementById('download-selected-btn');
+        if (downloadSelectedBtn) {
+            downloadSelectedBtn.addEventListener('click', function() {
+                // Get selected reference IDs
+                const selectedCheckboxes = document.querySelectorAll('.ref-select:checked');
+                const selectedReferenceIds = Array.from(selectedCheckboxes).map(checkbox => parseInt(checkbox.value));
+
+                if (selectedReferenceIds.length === 0) {
+                    alert('No images selected. Please select at least one image.');
+                    return;
+                }
+
+                // Download as zip
+                downloadReferencesAsZip(selectedReferenceIds);
+            });
+        }
+
+        // Modal functionality
+        const modal = document.getElementById('reference-modal');
+        const modalImage = document.getElementById('modal-image');
+        const modalName = document.getElementById('modal-name');
+        const modalCategorySubcategory = document.getElementById('modal-category-subcategory');
+        const modalDescription = document.getElementById('modal-description');
+        const modalUploadDate = document.getElementById('modal-upload-date');
+        const modalDownload = document.getElementById('modal-download');
+        const closeBtn = document.querySelector('.close');
+
+        // Open modal when clicking on a reference item
+        document.querySelectorAll('.reference-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                // Don't open modal if clicking on buttons or checkboxes
+                if (e.target.classList.contains('btn') || e.target.closest('.reference-actions')) {
+                    return;
+                }
+
+                const imgSrc = this.querySelector('img').src;
+                const category = this.getAttribute('data-category');
+                const subcategory = this.getAttribute('data-subcategory');
+                const name = this.querySelector('.reference-name').textContent;
+                const description = this.querySelector('.reference-description') ? 
+                                    this.querySelector('.reference-description').textContent : 
+                                    'No description available';
+
+                modalImage.src = imgSrc;
+                modalName.textContent = name;
+                modalCategorySubcategory.innerHTML = "Category: " + category + "<br>Sub-Category: " + subcategory;
+                modalDescription.textContent = description;
+                modalDownload.href = imgSrc;
+
+                modal.style.display = 'block';
+            });
+        });
+
+        // Close modal
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                modal.style.display = 'none';
+            });
+        }
+
+        // Close modal when clicking outside
+        window.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+
+        // Function to download references as zip
+        function downloadReferencesAsZip(referenceIds, customRefName = null) {
+            // Show loading indicator or message
+            alert('Preparing download...');
+
+            // Call the server endpoint to create and download the zip
+            fetch('/download_references_zip', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    reference_ids: referenceIds,
+                    custom_ref_name: '{{ custom_ref.name }}'
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                if (data.single_file) {
+                    // If only one file, download it directly
+                    const link = document.createElement('a');
+                    link.href = data.download_url;
+                    link.download = '';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } else if (data.success) {
+                    // For zip file, redirect to the download URL
+                    window.location.href = '/download_references_zip?t=' + new Date().getTime();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while preparing the download.');
+            });
+        }
+
+        // Download all images functionality
+        const downloadAllBtn = document.getElementById('download-all-btn');
+        if (downloadAllBtn) {
+            downloadAllBtn.addEventListener('click', function() {
+                // Get all reference IDs
+                const allReferenceIds = [];
+                document.querySelectorAll('.reference-item').forEach(item => {
+                    allReferenceIds.push(parseInt(item.getAttribute('data-id')));
+                });
+
+                if (allReferenceIds.length === 0) {
+                    alert('No images to download.');
+                    return;
+                }
+
+                // Download as zip
+                downloadReferencesAsZip(allReferenceIds);
+            });
+        }
+    });
+</script>
+{% endblock %}

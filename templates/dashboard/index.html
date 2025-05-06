@@ -1,0 +1,78 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Dashboard{% endblock %}
+
+{% block content %}
+<div class="modern-page-header">
+    <h1>Admin Dashboard</h1>
+    <p>Welcome to the admin dashboard. Here you can manage your art commission gallery.</p>
+</div>
+
+<div class="dashboard-stats">
+    <div class="stat-card">
+        <h3>References</h3>
+        <p>{{ ref_count }}</p>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Custom References</h3>
+        <p>{{ custom_ref_count }}</p>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Artists</h3>
+        <p>{{ artist_count }}</p>
+    </div>
+    
+    <div class="stat-card">
+        <h3>Commissions</h3>
+        <p>{{ comm_count }}</p>
+    </div>
+</div>
+
+<div class="dashboard-sections">
+    <div class="dashboard-section">
+        <h2>References</h2>
+        <p>Manage reference images organized by category and folder.</p>
+        <div class="dashboard-actions">
+            <a href="{{ url_for('dashboard_references') }}" class="btn">View All References</a>
+            <a href="{{ url_for('dashboard_add_reference') }}" class="btn">Add New Reference</a>
+        </div>
+    </div>
+    
+    <div class="dashboard-section">
+        <h2>Custom References</h2>
+        <p>Manage custom reference links for sharing with artists.</p>
+        <div class="dashboard-actions">
+            <a href="{{ url_for('dashboard_custom_references') }}" class="btn">View All Custom References</a>
+            <a href="{{ url_for('dashboard_add_custom_reference') }}" class="btn">Create New Custom Reference</a>
+        </div>
+    </div>
+    
+    <div class="dashboard-section">
+        <h2>Artists</h2>
+        <p>Manage artist information and social links.</p>
+        <div class="dashboard-actions">
+            <a href="{{ url_for('dashboard_artists') }}" class="btn">View All Artists</a>
+            <a href="{{ url_for('dashboard_add_artist') }}" class="btn">Add New Artist</a>
+        </div>
+    </div>
+    
+    <div class="dashboard-section">
+        <h2>Commissions</h2>
+        <p>Manage art commissions and their details.</p>
+        <div class="dashboard-actions">
+            <a href="{{ url_for('dashboard_commissions') }}" class="btn">View All Commissions</a>
+            <a href="{{ url_for('dashboard_add_commission') }}" class="btn">Add New Commission</a>
+        </div>
+    </div>
+    
+    <div class="dashboard-section">
+        <h2>Settings</h2>
+        <p>Manage site title and admin password.</p>
+        <div class="dashboard-actions">
+            <a href="{{ url_for('dashboard_settings') }}" class="btn">Edit Settings</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

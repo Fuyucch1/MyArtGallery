@@ -1,0 +1,116 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Manage References{% endblock %}
+
+{% block content %}
+<h1>Manage References</h1>
+<p>View, add, edit, and delete reference images.</p>
+
+<div class="dashboard-actions">
+    <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
+    <a href="{{ url_for('dashboard_add_reference') }}" class="btn">Add New Reference</a>
+</div>
+
+<div class="filter-controls">
+    <h3>Filter References</h3>
+    <div class="form-group">
+        <label for="category-filter">Category:</label>
+        <select id="category-filter" class="form-control">
+            <option value="">All Categories</option>
+            {% for category in categories %}
+            <option value="{{ category }}">{{ category }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="folder-filter">Subcategory:</label>
+        <select id="folder-filter" class="form-control">
+            <option value="">All Subcategories</option>
+            {% for folder in folders %}
+            <option value="{{ folder }}">{{ folder }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="visibility-filter">Visibility:</label>
+        <select id="visibility-filter" class="form-control">
+            <option value="">All</option>
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+        </select>
+    </div>
+</div>
+
+{% if references %}
+<table id="references-table">
+    <thead>
+        <tr>
+            <th>Thumbnail</th>
+            <th>Category</th>
+            <th>Subcategory</th>
+            <th>Visibility</th>
+            <th>Watermarked</th>
+            <th>Upload Date</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ref in references %}
+        <tr data-category="{{ ref.category }}" data-folder="{{ ref.subcategory }}" data-visibility="{{ 'public' if ref.public else 'private' }}">
+            <td>
+                <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" style="max-width: 100px; max-height: 100px;">
+            </td>
+            <td>{{ ref.category }}</td>
+            <td>{{ ref.subcategory }}</td>
+            <td>{{ 'Public' if ref.public else 'Private' }}</td>
+            <td>{{ 'Yes' if ref.watermarked else 'No' }}</td>
+            <td>{{ ref.upload_date.strftime('%Y-%m-%d') }}</td>
+            <td>
+                <a href="{{ url_for('dashboard_edit_reference', ref_id=ref.id) }}" class="btn btn-icon" title="Edit"><i class="fas fa-edit"></i></a>
+                <form method="POST" action="{{ url_for('dashboard_delete_reference', ref_id=ref.id) }}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete this reference?');">
+                    <button type="submit" class="btn btn-danger btn-icon" title="Delete"><i class="fas fa-trash"></i></button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No references available.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const categoryFilter = document.getElementById('category-filter');
+        const folderFilter = document.getElementById('folder-filter');
+        const visibilityFilter = document.getElementById('visibility-filter');
+        const rows = document.querySelectorAll('#references-table tbody tr');
+
+        function applyFilters() {
+            const categoryValue = categoryFilter.value;
+            const folderValue = folderFilter.value;
+            const visibilityValue = visibilityFilter.value;
+
+            rows.forEach(row => {
+                const categoryMatch = !categoryValue || row.getAttribute('data-category') === categoryValue;
+                const folderMatch = !folderValue || row.getAttribute('data-folder') === folderValue;
+                const visibilityMatch = !visibilityValue || row.getAttribute('data-visibility') === visibilityValue;
+
+                if (categoryMatch && folderMatch && visibilityMatch) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        categoryFilter.addEventListener('change', applyFilters);
+        folderFilter.addEventListener('change', applyFilters);
+        visibilityFilter.addEventListener('change', applyFilters);
+    });
+</script>
+{% endblock %}

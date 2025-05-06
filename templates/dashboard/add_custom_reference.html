@@ -1,0 +1,132 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Add Custom Reference{% endblock %}
+
+{% block content %}
+<h1>Create New Custom Reference</h1>
+<p>Create a custom reference link containing selected reference images.</p>
+
+<div class="dashboard-actions">
+    <a href="{{ url_for('dashboard_custom_references') }}" class="btn">Back to Custom References</a>
+</div>
+
+<form method="POST" action="{{ url_for('dashboard_add_custom_reference') }}">
+    <div class="form-group">
+        <label for="name">Custom Reference Name:</label>
+        <input type="text" id="name" name="name" class="form-control" required>
+        <small>This name will be used to identify the custom reference link.</small>
+    </div>
+    
+    <div class="form-group">
+        <label>Select References to Include:</label>
+        <div class="selected-count">Selected: <span id="selected-count">0</span></div>
+        
+        <div class="filter-controls">
+            <div class="form-group">
+                <label for="category-filter">Filter by Category:</label>
+                <select id="category-filter" class="form-control">
+                    <option value="">All Categories</option>
+                    {% for ref in references %}
+                        {% if loop.first or references[loop.index0 - 1].category != ref.category %}
+                            <option value="{{ ref.category }}">{{ ref.category }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="folder-filter">Filter by Folder:</label>
+                <select id="folder-filter" class="form-control">
+                    <option value="">All Folders</option>
+                    {% for ref in references %}
+                        {% if loop.first or references[loop.index0 - 1].folder != ref.folder %}
+                            <option value="{{ ref.folder }}">{{ ref.folder }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <div class="reference-selection">
+        {% if references %}
+            <div class="reference-grid">
+                {% for ref in references %}
+                <div class="reference-item" data-category="{{ ref.category }}" data-folder="{{ ref.folder }}">
+                    <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" style="max-width: 150px; max-height: 150px;">
+                    <div class="reference-info">
+                        <p>{{ ref.category }} / {{ ref.folder }}</p>
+                        <label>
+                            <input type="checkbox" name="references" value="{{ ref.id }}" class="reference-checkbox">
+                            Include
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No references available. Please add some references first.</p>
+        {% endif %}
+    </div>
+    
+    <div class="form-group">
+        <button type="submit" class="btn">Create Custom Reference</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const categoryFilter = document.getElementById('category-filter');
+        const folderFilter = document.getElementById('folder-filter');
+        const referenceItems = document.querySelectorAll('.reference-item');
+        const checkboxes = document.querySelectorAll('.reference-checkbox');
+        const selectedCount = document.getElementById('selected-count');
+        
+        // Update selected count
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.reference-checkbox:checked').length;
+            selectedCount.textContent = count;
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            const categoryValue = categoryFilter.value;
+            const folderValue = folderFilter.value;
+            
+            referenceItems.forEach(item => {
+                const categoryMatch = !categoryValue || item.getAttribute('data-category') === categoryValue;
+                const folderMatch = !folderValue || item.getAttribute('data-folder') === folderValue;
+                
+                if (categoryMatch && folderMatch) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+        
+        // Add event listeners
+        categoryFilter.addEventListener('change', applyFilters);
+        folderFilter.addEventListener('change', applyFilters);
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateSelectedCount);
+        });
+        
+        // Form validation
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            const checkedCount = document.querySelectorAll('.reference-checkbox:checked').length;
+            if (checkedCount === 0) {
+                e.preventDefault();
+                alert('Please select at least one reference image.');
+            }
+        });
+        
+        // Initialize
+        updateSelectedCount();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,544 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Commissions{% endblock %}
+
+{% block content %}
+<div class="modern-page-header">
+    <h1>Commissions</h1>
+    <p>View past art commissions with details and images.</p>
+</div>
+
+{% if session.get('authenticated') %}
+<div class="dashboard-actions">
+    <a href="{{ url_for('dashboard_commissions') }}" class="btn">Manage Commissions</a>
+    <a href="{{ url_for('dashboard_add_commission') }}" class="btn">Add New Commission</a>
+</div>
+{% endif %}
+
+{% if commissions %}
+    <div class="modern-commission-grid">
+        {% for commission in commissions %}
+        <div class="modern-commission-item" data-commission-id="{{ commission.id }}">
+            {% if commission.thumbnail %}
+            <img src="{{ url_for('static', filename='uploads/commissions/' + commission.thumbnail) }}" alt="{{ commission.title }}" class="modern-commission-image">
+            {% else %}
+            <div class="no-image">No Image</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <p>No commissions available.</p>
+{% endif %}
+
+<!-- Commission Detail Modal -->
+<div id="commission-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <div class="modal-body">
+            <div class="modal-image-container">
+                <div class="carousel" data-total-slides="0">
+                    <div class="carousel-inner">
+                        <!-- Images will be loaded here -->
+                    </div>
+
+                    <button class="carousel-control prev" onclick="prevSlide()">❮</button>
+                    <button class="carousel-control next" onclick="nextSlide()">❯</button>
+
+                    <div class="carousel-indicators">
+                        <!-- Indicators will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-details">
+                <h2 id="modal-title"></h2>
+
+                <div class="detail-item">
+                    <h3>Artist</h3>
+                    <p id="modal-artist"></p>
+                </div>
+
+                <div class="detail-item">
+                    <h3>Date</h3>
+                    <p id="modal-date"></p>
+                </div>
+
+                <div class="detail-item" id="modal-price-container" style="display: none;">
+                    <h3>Price</h3>
+                    <p id="modal-price"></p>
+                </div>
+
+                <div class="detail-item" id="modal-description-container" style="display: none;">
+                    <h3>Description</h3>
+                    <p id="modal-description"></p>
+                </div>
+
+                <div class="detail-item" id="modal-commission-link-container" style="display: none;">
+                    <h3>Commission Link</h3>
+                    <p id="modal-commission-link"></p>
+                </div>
+
+                <div class="detail-item" id="modal-social-links-container" style="display: none;">
+                    <h3>Artist Social Links</h3>
+                    <div id="modal-social-links"></div>
+                </div>
+
+                <div class="detail-item" id="modal-custom-ref-container" style="display: none;">
+                    <h3>Custom References</h3>
+                    <div id="modal-custom-ref"></div>
+                </div>
+
+                {% if session.get('authenticated') %}
+                <div class="admin-actions">
+                    <a id="modal-edit-link" href="#" class="btn">Edit Commission</a>
+                    <a id="modal-download-link" href="#" class="btn" target="_blank">Download All Files</a>
+                    <form id="modal-delete-form" method="POST" action="#" class="inline-form" onsubmit="return confirm('Are you sure you want to delete this commission?');">
+                        <button type="submit" class="btn btn-danger">Delete Commission</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
+<script src="https://unpkg.com/imagesloaded@5/imagesloaded.pkgd.min.js"></script>
+<script>
+    let currentSlide = 1;
+    let totalSlides = 0;
+
+    // Initialize Masonry after all images are loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        const grid = document.querySelector('.modern-commission-grid');
+        let masonry;
+
+        // Function to assign size class based on image orientation
+        function assignSizeClass(img, item) {
+            // Check if image is landscape (width > height)
+            const isLandscape = img.naturalWidth > img.naturalHeight;
+
+            if (isLandscape) {
+                // For landscape images, check if height at 100% width would exceed 80% of viewport height
+                const viewportHeight = window.innerHeight;
+                const aspectRatio = img.naturalHeight / img.naturalWidth;
+                const heightAt100PercentWidth = window.innerWidth * aspectRatio;
+
+                if (heightAt100PercentWidth > viewportHeight * 0.8) {
+                    // If height would exceed 80% of viewport height, select large size (75%)
+
+                    item.classList.add('large-size');
+                } else {
+                    // Otherwise, landscape images take medium size to allow side-by-side display
+                    item.classList.add('medium-size');
+                }
+            } else {
+                // Portrait or square images take medium size (33.333%)
+                // This ensures at least 2 images can fit in a row
+                item.classList.add('medium-size');
+            }
+        }
+
+        // Initialize imagesLoaded to ensure Masonry works correctly with images
+        imagesLoaded(grid, function() {
+            // Process each image to determine orientation and assign appropriate size class
+            const items = document.querySelectorAll('.modern-commission-item');
+            items.forEach(item => {
+                const img = item.querySelector('img');
+                if (img) {
+                    // Check if image is already loaded
+                    if (img.complete) {
+                        assignSizeClass(img, item);
+                    } else {
+                        // If not loaded yet, add load event listener
+                        img.addEventListener('load', function() {
+                            assignSizeClass(img, item);
+                            // Re-layout Masonry after image is loaded and sized
+                            if (masonry) {
+                                masonry.layout();
+                            }
+                        });
+                    }
+                } else {
+                    // No image, default to medium size
+                    item.classList.add('medium-size');
+                }
+            });
+
+            // Initialize Masonry
+            // Add a dummy element with medium-size class to ensure consistent column width
+            const dummyElement = document.createElement('div');
+            dummyElement.className = 'modern-commission-item medium-size masonry-sizer';
+            dummyElement.style.visibility = 'hidden';
+            dummyElement.style.position = 'absolute';
+            grid.appendChild(dummyElement);
+
+            masonry = new Masonry(grid, {
+                itemSelector: '.modern-commission-item',
+                columnWidth: '.masonry-sizer',
+                percentPosition: true,
+                gutter: 15
+            });
+
+            // Re-layout Masonry when window is resized
+            window.addEventListener('resize', function() {
+                masonry.layout();
+            });
+        });
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add click event to commission items
+        document.querySelectorAll('.modern-commission-item, .commission-card, .view-details-btn').forEach(item => {
+            item.addEventListener('click', function(e) {
+                // If clicking on the card but not the button, open the modal
+                if (this.classList.contains('commission-card') && e.target.classList.contains('view-details-btn')) {
+                    return; // Let the button handle its own click
+                }
+
+                const commissionId = this.getAttribute('data-commission-id');
+                openCommissionModal(commissionId);
+            });
+        });
+
+        // Close modal when clicking on X or outside
+        const modal = document.getElementById('commission-modal');
+        const closeBtn = modal.querySelector('.close');
+
+        closeBtn.addEventListener('click', function() {
+            modal.style.display = 'none';
+        });
+
+        window.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    });
+
+    function openCommissionModal(commissionId) {
+        // Show loading state
+        const modal = document.getElementById('commission-modal');
+        modal.style.display = 'block';
+        document.getElementById('modal-title').textContent = 'Loading...';
+
+        // Fetch commission details
+        fetch(`/api/commission/${commissionId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    modal.style.display = 'none';
+                    return;
+                }
+
+                // Update modal content
+                updateModalContent(data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while loading the commission details.');
+                modal.style.display = 'none';
+            });
+    }
+
+    function updateModalContent(commission) {
+        // Update title and basic info
+        document.getElementById('modal-title').textContent = commission.title;
+        document.getElementById('modal-artist').textContent = commission.artist_name;
+        document.getElementById('modal-date').textContent = commission.commission_date || 'N/A';
+
+        // Update price if available
+        const priceContainer = document.getElementById('modal-price-container');
+        if (commission.price) {
+            document.getElementById('modal-price').textContent = `$${commission.price}`;
+            priceContainer.style.display = '';
+        } else {
+            priceContainer.style.display = 'none';
+        }
+
+        // Update description if available
+        const descriptionContainer = document.getElementById('modal-description-container');
+        if (commission.description) {
+            document.getElementById('modal-description').textContent = commission.description;
+            descriptionContainer.style.display = '';
+        } else {
+            descriptionContainer.style.display = 'none';
+        }
+
+        // Update commission link if available
+        const commissionLinkContainer = document.getElementById('modal-commission-link-container');
+        if (commission.commission_link) {
+            const linkElement = document.createElement('a');
+            linkElement.href = commission.commission_link;
+            linkElement.textContent = 'Visit Commission Page';
+            linkElement.target = '_blank';
+            linkElement.className = 'btn';
+
+            const linkContainer = document.getElementById('modal-commission-link');
+            linkContainer.innerHTML = '';
+            linkContainer.appendChild(linkElement);
+
+            commissionLinkContainer.style.display = '';
+        } else {
+            commissionLinkContainer.style.display = 'none';
+        }
+
+        // Update social links if available
+        const socialLinksContainer = document.getElementById('modal-social-links-container');
+        if (commission.social_links) {
+            const socialLinksElement = document.getElementById('modal-social-links');
+            socialLinksElement.innerHTML = '';
+            socialLinksElement.className = 'social-links';
+
+            // Parse social links and create clickable links
+            const links = commission.social_links.split(/[,\n]+/).map(link => link.trim()).filter(link => link);
+
+            links.forEach(link => {
+                // Check if it's a URL or just text
+                if (link.match(/^https?:\/\//i) || link.match(/^www\./i)) {
+                    // It's a URL - create a link with appropriate icon
+                    const a = document.createElement('a');
+                    a.href = link.match(/^https?:\/\//i) ? link : `https://${link}`;
+                    a.target = '_blank';
+                    a.className = 'social-link generic';
+
+                    // Determine icon based on URL
+                    let icon = 'fa-globe';
+                    let platform = 'generic';
+
+                    a.className = `social-link ${platform}`;
+
+                    // Create icon
+                    const i = document.createElement('i');
+                    i.className = `fas ${icon}`;
+                    a.appendChild(i);
+
+                    // Create text
+                    const displayText = link.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
+                    const span = document.createElement('span');
+                    span.textContent = displayText;
+                    a.appendChild(span);
+
+                    socialLinksElement.appendChild(a);
+                } else if (link.includes(':')) {
+                    // It's in format "Platform: handle"
+                    const [platform, handle] = link.split(':').map(part => part.trim());
+
+                    // Determine platform details
+                    let url = null;
+                    let icon = 'fa-globe';
+                    let platformClass = 'generic';
+
+                    // Create link element
+                    const a = document.createElement('a');
+                    a.className = `social-link ${platformClass}`;
+
+                    if (url) {
+                        a.href = url;
+                        a.target = '_blank';
+
+                        // Add icon
+                        const i = document.createElement('i');
+                        i.className = `fab ${icon}`;
+                        a.appendChild(i);
+
+                        // Add display text
+                        const displayText = platform + ': ' + handle;
+                        const span = document.createElement('span');
+                        span.textContent = displayText;
+                        a.appendChild(span);
+                    } else {
+                        // No URL could be determined, just show as text with generic icon
+                        const i = document.createElement('i');
+                        i.className = 'fas fa-link';
+                        a.appendChild(i);
+
+                        const span = document.createElement('span');
+                        span.textContent = link;
+                        a.appendChild(span);
+                    }
+
+                    socialLinksElement.appendChild(a);
+                } else {
+                    // Just text - create a non-clickable styled element
+                    const div = document.createElement('div');
+                    div.className = 'social-link generic';
+
+                    const i = document.createElement('i');
+                    i.className = 'fas fa-info-circle';
+                    div.appendChild(i);
+
+                    const span = document.createElement('span');
+                    span.textContent = link;
+                    div.appendChild(span);
+
+                    socialLinksElement.appendChild(div);
+                }
+            });
+
+            socialLinksContainer.style.display = '';
+        } else {
+            socialLinksContainer.style.display = 'none';
+        }
+
+        // Update custom reference link if available
+        const customRefContainer = document.getElementById('modal-custom-ref-container');
+        if (commission.custom_ref_link) {
+            const customRefElement = document.getElementById('modal-custom-ref');
+            customRefElement.innerHTML = '';
+
+            const button = document.createElement('button');
+            button.className = 'btn';
+            button.textContent = 'View Custom References';
+            button.onclick = function() {
+                window.open(`/custom_reference/${commission.custom_ref_link}`, '_blank');
+            };
+
+            customRefElement.appendChild(button);
+            customRefContainer.style.display = '';
+        } else {
+            customRefContainer.style.display = 'none';
+        }
+
+        // Update admin actions if authenticated
+        if (document.querySelector('.admin-actions')) {
+            const editLink = document.getElementById('modal-edit-link');
+            editLink.href = `/dashboard/commissions/edit/${commission.id}`;
+
+            // Add click event listener to ensure navigation works
+            editLink.onclick = function(e) {
+                window.location.href = this.href;
+                return false; // Prevent default to ensure our navigation takes precedence
+            };
+
+            // Set download link for the commission folder
+            const downloadLink = document.getElementById('modal-download-link');
+            downloadLink.href = `/download_commission_folder/${commission.id}`;
+
+            document.getElementById('modal-delete-form').action = `/dashboard/commissions/delete/${commission.id}`;
+        }
+
+        // Update carousel with images
+        updateCarousel(commission.images);
+    }
+
+    function updateCarousel(images) {
+        const carousel = document.querySelector('.carousel');
+        const carouselInner = carousel.querySelector('.carousel-inner');
+        const indicators = carousel.querySelector('.carousel-indicators');
+
+        // Clear existing content
+        carouselInner.innerHTML = '';
+        indicators.innerHTML = '';
+
+        if (images && images.length > 0) {
+            // Update total slides
+            totalSlides = images.length;
+            carousel.setAttribute('data-total-slides', totalSlides);
+
+            // Add images to carousel
+            images.forEach((image, index) => {
+                const slideNumber = index + 1;
+
+                // Create carousel item
+                const item = document.createElement('div');
+                item.className = 'carousel-item';
+                item.id = `slide-${slideNumber}`;
+
+                const img = document.createElement('img');
+                // The filename now includes the path relative to commissions folder
+                img.src = `/static/uploads/commissions/${image.filename}`;
+                img.alt = `Image ${slideNumber}`;
+                img.className = 'no-right-click';
+
+                item.appendChild(img);
+                carouselInner.appendChild(item);
+
+                // Create indicator if there are multiple images
+                if (images.length > 1) {
+                    const indicator = document.createElement('button');
+                    indicator.className = 'indicator';
+                    indicator.setAttribute('data-slide', slideNumber);
+                    indicator.id = `indicator-${slideNumber}`;
+                    indicator.onclick = function() { goToSlide(slideNumber); };
+
+                    indicators.appendChild(indicator);
+                }
+            });
+
+            // Show carousel controls if there are multiple images
+            const prevBtn = carousel.querySelector('.prev');
+            const nextBtn = carousel.querySelector('.next');
+
+            if (images.length > 1) {
+                prevBtn.style.display = '';
+                nextBtn.style.display = '';
+                indicators.style.display = '';
+            } else {
+                prevBtn.style.display = 'none';
+                nextBtn.style.display = 'none';
+                indicators.style.display = 'none';
+            }
+
+            // Initialize carousel
+            showSlide(1);
+        } else {
+            // No images
+            const noImages = document.createElement('div');
+            noImages.className = 'no-images';
+            noImages.innerHTML = '<p>No images available for this commission.</p>';
+
+            carouselInner.appendChild(noImages);
+
+            // Hide carousel controls
+            carousel.querySelector('.prev').style.display = 'none';
+            carousel.querySelector('.next').style.display = 'none';
+            indicators.style.display = 'none';
+        }
+    }
+
+    function showSlide(n) {
+        // Update current slide
+        currentSlide = n;
+
+        // Handle wrapping
+        if (currentSlide > totalSlides) {
+            currentSlide = 1;
+        } else if (currentSlide < 1) {
+            currentSlide = totalSlides;
+        }
+
+        // Update carousel position
+        const carouselInner = document.querySelector('.carousel-inner');
+        if (carouselInner) {
+            carouselInner.style.transform = `translateX(-${(currentSlide - 1) * 100}%)`;
+        }
+
+        // Update indicators
+        const indicators = document.querySelectorAll('.indicator');
+        indicators.forEach((indicator, index) => {
+            if (index + 1 === currentSlide) {
+                indicator.classList.add('active');
+            } else {
+                indicator.classList.remove('active');
+            }
+        });
+    }
+
+    function nextSlide() {
+        showSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+        showSlide(currentSlide - 1);
+    }
+
+    function goToSlide(n) {
+        showSlide(n);
+    }
+</script>
+{% endblock %}

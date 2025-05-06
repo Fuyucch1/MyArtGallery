@@ -1,0 +1,35 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Add Artist{% endblock %}
+
+{% block content %}
+<h1>Add New Artist</h1>
+<p>Add a new artist to the database.</p>
+
+<div class="dashboard-actions">
+    <a href="{{ url_for('dashboard_artists') }}" class="btn">Back to Artists</a>
+</div>
+
+<form method="POST" action="{{ url_for('dashboard_add_artist') }}">
+    <div class="form-group">
+        <label for="name">Artist Name:</label>
+        <input type="text" id="name" name="name" class="form-control" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="social_links">Social Links:</label>
+        <textarea id="social_links" name="social_links" class="form-control" rows="3" placeholder="Twitter: @artist, Instagram: @artist, etc."></textarea>
+        <small>Enter social media links or handles, one per line or comma-separated.</small>
+    </div>
+    
+    <div class="form-group">
+        <label for="notes">Notes:</label>
+        <textarea id="notes" name="notes" class="form-control" rows="5" placeholder="Additional information about the artist..."></textarea>
+        <small>Any additional information about the artist, such as preferred payment methods, communication preferences, etc.</small>
+    </div>
+    
+    <div class="form-group">
+        <button type="submit" class="btn">Add Artist</button>
+    </div>
+</form>
+{% endblock %}

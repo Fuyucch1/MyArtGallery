@@ -1,0 +1,164 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Edit Reference{% endblock %}
+
+{% block content %}
+<h1>Edit Reference</h1>
+<p>Update reference image details.</p>
+
+<div class="dashboard-actions">
+    <a href="{{ url_for('dashboard_references') }}" class="btn">Back to References</a>
+</div>
+
+<div class="reference-preview">
+    <img src="{{ url_for('static', filename='uploads/references/' + reference.filename) }}" alt="Reference" style="max-width: 300px; max-height: 300px;">
+    <p>Filename: {{ reference.filename }}</p>
+    <p>Upload Date: {{ reference.upload_date.strftime('%Y-%m-%d') }}</p>
+    <p>Watermarked: {{ 'Yes' if reference.watermarked else 'No' }}</p>
+</div>
+
+<form method="POST" action="{{ url_for('dashboard_edit_reference', ref_id=reference.id) }}">
+    <div class="form-group">
+        <label for="name">Reference Name:</label>
+        <input type="text" id="name" name="name" class="form-control" value="{{ reference.name }}" placeholder="Enter a name for this reference">
+        <small>If left blank, the filename will be used.</small>
+    </div>
+
+    <div class="form-group">
+        <label for="category-select">Category:</label>
+        <select id="category-select" class="form-control" onchange="toggleCategoryInput()">
+            <option value="">Select a category</option>
+            {% for category in categories %}
+            <option value="{{ category }}" {% if category == reference.category %}selected{% endif %}>{{ category }}</option>
+            {% endfor %}
+            <option value="other">Other (create new)</option>
+        </select>
+        <div id="new-category-container" style="display: none; margin-top: 10px;">
+            <input type="text" id="category" name="category" class="form-control" value="{{ reference.category }}" placeholder="Enter new category" required>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="subcategory-select">Subcategory:</label>
+        <select id="subcategory-select" class="form-control" onchange="toggleSubcategoryInput()">
+            <option value="">Select a subcategory</option>
+            {% for folder in folders %}
+            <option value="{{ folder }}" {% if folder == reference.subcategory %}selected{% endif %}>{{ folder }}</option>
+            {% endfor %}
+            <option value="other">Other (create new)</option>
+        </select>
+        <div id="new-subcategory-container" style="display: none; margin-top: 10px;">
+            <input type="text" id="subcategory" name="subcategory" class="form-control" value="{{ reference.subcategory }}" placeholder="Enter new subcategory" required>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description:</label>
+        <textarea id="description" name="description" class="form-control" rows="3" placeholder="Enter a description for this reference...">{{ reference.description }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label>
+            <input type="checkbox" id="public" name="public" {% if reference.public %}checked{% endif %}>
+            Public (visible to everyone)
+        </label>
+    </div>
+
+    <div class="form-group">
+        <button type="submit" class="btn">Update Reference</button>
+    </div>
+</form>
+
+<div class="danger-zone">
+    <h3>Danger Zone</h3>
+    <form method="POST" action="{{ url_for('dashboard_delete_reference', ref_id=reference.id) }}" onsubmit="return confirm('Are you sure you want to delete this reference? This action cannot be undone.');">
+        <button type="submit" class="btn btn-danger">Delete Reference</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleCategoryInput() {
+        const select = document.getElementById('category-select');
+        const container = document.getElementById('new-category-container');
+        const input = document.getElementById('category');
+
+        if (select.value === 'other') {
+            container.style.display = 'block';
+            input.required = true;
+            // Don't clear the input if it already has a value
+            if (!input.value) {
+                input.value = '';
+            }
+        } else {
+            container.style.display = 'none';
+            input.required = false;
+            input.value = select.value;
+        }
+    }
+
+    function toggleSubcategoryInput() {
+        const select = document.getElementById('subcategory-select');
+        const container = document.getElementById('new-subcategory-container');
+        const input = document.getElementById('subcategory');
+
+        if (select.value === 'other') {
+            container.style.display = 'block';
+            input.required = true;
+            // Don't clear the input if it already has a value
+            if (!input.value) {
+                input.value = '';
+            }
+        } else {
+            container.style.display = 'none';
+            input.required = false;
+            input.value = select.value;
+        }
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if the current category is in the dropdown list
+        const categorySelect = document.getElementById('category-select');
+        const categoryInput = document.getElementById('category');
+        const currentCategory = "{{ reference.category }}";
+
+        let categoryFound = false;
+        for (let i = 0; i < categorySelect.options.length; i++) {
+            if (categorySelect.options[i].value === currentCategory) {
+                categoryFound = true;
+                break;
+            }
+        }
+
+        if (!categoryFound && currentCategory) {
+            categorySelect.value = 'other';
+            document.getElementById('new-category-container').style.display = 'block';
+            categoryInput.required = true;
+        }
+
+        // Check if the current subcategory is in the dropdown list
+        const subcategorySelect = document.getElementById('subcategory-select');
+        const subcategoryInput = document.getElementById('subcategory');
+        const currentSubcategory = "{{ reference.subcategory }}";
+
+        let subcategoryFound = false;
+        for (let i = 0; i < subcategorySelect.options.length; i++) {
+            if (subcategorySelect.options[i].value === currentSubcategory) {
+                subcategoryFound = true;
+                break;
+            }
+        }
+
+        if (!subcategoryFound && currentSubcategory) {
+            subcategorySelect.value = 'other';
+            document.getElementById('new-subcategory-container').style.display = 'block';
+            subcategoryInput.required = true;
+        }
+
+        toggleCategoryInput();
+        toggleSubcategoryInput();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ site_title }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div id="branding">
+                <h1>{{ site_title }}</h1>
+            </div>
+            <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            <nav id="main-nav">
+                <ul>
+                    <li class="{% if request.path == '/' %}current{% endif %}">
+                        <a href="{{ url_for('index') }}">Home</a>
+                    </li>
+                    <li class="{% if request.path == '/references' %}current{% endif %}">
+                        <a href="{{ url_for('references') }}">References</a>
+                    </li>
+                    <li class="{% if request.path == '/commissions' %}current{% endif %}">
+                        <a href="{{ url_for('commissions') }}">Commissions</a>
+                    </li>
+                    {% if session.get('authenticated') %}
+                    <li class="{% if '/dashboard' in request.path %}current{% endif %}">
+                        <a href="{{ url_for('dashboard') }}">Dashboard</a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('logout') }}">Logout</a>
+                    </li>
+                    {% endif %}
+                    <li class="theme-toggle-container">
+                        <button id="theme-toggle" aria-label="Toggle dark/light mode">
+                            <i class="fas fa-moon dark-icon"></i>
+                            <i class="fas fa-sun light-icon"></i>
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <section class="main">
+            {% block content %}{% endblock %}
+        </section>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="flash-messages" id="flash-messages">
+                {% for message in messages %}
+                    <div class="flash-success">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <footer>
+        <div class="container">
+            <p class="ai-unfriendly">This website and all its content are AI unfriendly. All images are protected and should not be used for AI training.</p>
+            <p class="footer-credit">&copy; {{ site_title }} - 2025 - Made with ❤️ by Fuyucchi - <a href="https://github.com/Fuyucch1/MyArtGallery" target="_blank">GitHub</a>{% if contact_link %} - <a href="{{ contact_link }}" target="_blank">Contact me here</a>{% endif %}</p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const menuToggle = document.getElementById('menu-toggle');
+            const mainNav = document.getElementById('main-nav');
+            const root = document.documentElement;
+
+            // Mobile menu toggle
+            if (menuToggle && mainNav) {
+                menuToggle.addEventListener('click', function() {
+                    mainNav.classList.toggle('active');
+                    // Change icon based on menu state
+                    const icon = menuToggle.querySelector('i');
+                    if (mainNav.classList.contains('active')) {
+                        icon.classList.remove('fa-bars');
+                        icon.classList.add('fa-times');
+                    } else {
+                        icon.classList.remove('fa-times');
+                        icon.classList.add('fa-bars');
+                    }
+                });
+
+                // Close menu when clicking outside
+                document.addEventListener('click', function(event) {
+                    if (!mainNav.contains(event.target) && !menuToggle.contains(event.target) && mainNav.classList.contains('active')) {
+                        mainNav.classList.remove('active');
+                        const icon = menuToggle.querySelector('i');
+                        icon.classList.remove('fa-times');
+                        icon.classList.add('fa-bars');
+                    }
+                });
+
+                // Close menu when clicking on a link
+                const navLinks = mainNav.querySelectorAll('a');
+                navLinks.forEach(link => {
+                    link.addEventListener('click', function() {
+                        if (window.innerWidth <= 768) {
+                            mainNav.classList.remove('active');
+                            const icon = menuToggle.querySelector('i');
+                            icon.classList.remove('fa-times');
+                            icon.classList.add('fa-bars');
+                        }
+                    });
+                });
+            }
+
+            // Flash messages handling
+            const flashMessages = document.getElementById('flash-messages');
+            if (flashMessages) {
+                // Show the flash messages
+                setTimeout(function() {
+                    flashMessages.classList.add('show');
+
+                    // Hide the flash messages after 5 seconds
+                    setTimeout(function() {
+                        flashMessages.classList.remove('show');
+
+                        // Remove from DOM after fade out animation completes
+                        setTimeout(function() {
+                            flashMessages.remove();
+                        }, 300); // Match the transition duration in CSS
+                    }, 5000);
+                }, 100);
+            }
+
+            // Function to set theme
+            function setTheme(theme) {
+                if (theme === 'dark') {
+                    root.classList.remove('light-theme');
+                    root.classList.add('dark-theme');
+                    localStorage.setItem('theme', 'dark');
+                } else if (theme === 'light') {
+                    root.classList.remove('dark-theme');
+                    root.classList.add('light-theme');
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    // Use system preference
+                    root.classList.remove('dark-theme');
+                    root.classList.remove('light-theme');
+                    localStorage.removeItem('theme');
+                }
+            }
+
+            // Check for saved theme preference or use system preference
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme) {
+                setTheme(savedTheme);
+            } else {
+                // Check system preference
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                // Don't set a class, let the CSS media query handle it
+            }
+
+            // Toggle theme on button click
+            themeToggle.addEventListener('click', function() {
+                if (root.classList.contains('dark-theme')) {
+                    setTheme('light');
+                } else if (root.classList.contains('light-theme')) {
+                    setTheme('system');
+                } else {
+                    setTheme('dark');
+                }
+            });
+
+            // Listen for system preference changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                if (!localStorage.getItem('theme')) {
+                    // Only update if user hasn't set a preference
+                    // No need to set a class, let the CSS media query handle it
+                }
+            });
+        });
+    </script>
+</body>
+</html>

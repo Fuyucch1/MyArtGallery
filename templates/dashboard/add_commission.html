@@ -1,0 +1,204 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Add Commission{% endblock %}
+
+{% block content %}
+<h1>Add New Commission</h1>
+<p>Add a new art commission to the gallery.</p>
+
+<div class="dashboard-actions">
+    <a href="{{ url_for('dashboard_commissions') }}" class="btn">Back to Commissions</a>
+</div>
+
+<form method="POST" action="{{ url_for('dashboard_add_commission') }}" enctype="multipart/form-data">
+    <div class="form-group">
+        <label for="title">Commission Title:</label>
+        <input type="text" id="title" name="title" class="form-control" required>
+    </div>
+
+    <div class="form-group">
+        <label for="artist_id">Artist:</label>
+        <select id="artist_id" name="artist_id" class="form-control" required>
+            <option value="">Select an Artist</option>
+            {% for artist in artists %}
+            <option value="{{ artist.id }}">{{ artist.name }}</option>
+            {% endfor %}
+        </select>
+        <small>If the artist is not listed, <a href="{{ url_for('dashboard_add_artist') }}" target="_blank">add them first</a>.</small>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description:</label>
+        <textarea id="description" name="description" class="form-control" rows="5" placeholder="Description of the commission..."></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="price">Price:</label>
+        <input type="number" id="price" name="price" class="form-control" step="0.01" min="0">
+    </div>
+
+    <div class="form-group">
+        <label for="commission_date">Commission Date:</label>
+        <input type="date" id="commission_date" name="commission_date" class="form-control">
+    </div>
+
+    <div class="form-group">
+        <label for="commission_link">Commission Link:</label>
+        <input type="url" id="commission_link" name="commission_link" class="form-control" placeholder="https://example.com/commission">
+        <small>Link to the original commission page, if applicable.</small>
+    </div>
+
+    <div class="form-group">
+        <label for="custom_ref_id">Custom Reference Link:</label>
+        <select id="custom_ref_id" name="custom_ref_id" class="form-control">
+            <option value="">None</option>
+            {% for ref in custom_refs %}
+            <option value="{{ ref.id }}">{{ ref.name }}</option>
+            {% endfor %}
+        </select>
+        <small>If you've created a custom reference link for this commission, select it here.</small>
+    </div>
+
+    <div class="form-group">
+        <label>
+            <input type="checkbox" id="public" name="public" checked>
+            Public (visible to everyone)
+        </label>
+    </div>
+
+    <div class="form-group">
+        <label for="images">Commission Images:</label>
+        <input type="file" id="images" name="images" class="form-control" accept="image/*" multiple>
+        <small>You can select multiple images. Preview and reorder them below. The first image will be used as the thumbnail.</small>
+    </div>
+
+    <div class="form-group" id="image-preview-container" style="display: none;">
+        <label>Image Preview:</label>
+        <p>Drag and drop to reorder. The first image will be used as the thumbnail.</p>
+        <div id="image-preview" class="image-grid sortable-grid"></div>
+        <input type="hidden" id="image-order" name="image-order" value="">
+    </div>
+
+    <div class="form-group">
+        <label>
+            <input type="checkbox" id="watermark" name="watermark" onchange="toggleWatermarkText()">
+            Add AI-unfriendly watermark to images
+        </label>
+    </div>
+
+    <div class="form-group" id="watermark-text-container" style="display: none;">
+        <label for="watermark_text">Watermark Text:</label>
+        <input type="text" id="watermark_text" name="watermark_text" class="form-control" placeholder="Enter text for the watermark">
+        <small>Leave blank to use the default text: "DO NOT USE FOR AI TRAINING"</small>
+    </div>
+
+    <div class="form-group">
+        <button type="submit" class="btn">Add Commission</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+<script>
+    function toggleWatermarkText() {
+        const checkbox = document.getElementById('watermark');
+        const container = document.getElementById('watermark-text-container');
+
+        if (checkbox.checked) {
+            container.style.display = 'block';
+        } else {
+            container.style.display = 'none';
+        }
+    }
+
+    // File preview and reordering functionality
+    let fileList = [];
+
+    function handleFileSelect(event) {
+        const files = event.target.files;
+        if (files.length === 0) {
+            document.getElementById('image-preview-container').style.display = 'none';
+            return;
+        }
+
+        // Store files for later use
+        fileList = Array.from(files);
+
+        // Clear previous previews
+        const previewContainer = document.getElementById('image-preview');
+        previewContainer.innerHTML = '';
+
+        // Create previews for each file
+        fileList.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'image-item';
+                previewItem.dataset.index = index;
+
+                const img = document.createElement('img');
+                img.src = e.target.result;
+                img.alt = 'Preview';
+                img.style.maxWidth = '150px';
+                img.style.maxHeight = '150px';
+
+                const indexLabel = document.createElement('div');
+                indexLabel.className = 'image-index';
+                indexLabel.textContent = index === 0 ? 'Thumbnail' : `Image ${index + 1}`;
+
+                previewItem.appendChild(img);
+                previewItem.appendChild(indexLabel);
+                previewContainer.appendChild(previewItem);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Show the preview container
+        document.getElementById('image-preview-container').style.display = 'block';
+
+        // Initialize Sortable
+        initSortable();
+    }
+
+    function initSortable() {
+        const el = document.getElementById('image-preview');
+        Sortable.create(el, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: function() {
+                updateImageOrder();
+                updateImageLabels();
+            }
+        });
+    }
+
+    function updateImageOrder() {
+        const items = document.querySelectorAll('#image-preview .image-item');
+        const order = Array.from(items).map(item => item.dataset.index);
+        document.getElementById('image-order').value = order.join(',');
+    }
+
+    function updateImageLabels() {
+        const items = document.querySelectorAll('#image-preview .image-item');
+        items.forEach((item, index) => {
+            const label = item.querySelector('.image-index');
+            label.textContent = index === 0 ? 'Thumbnail' : `Image ${index + 1}`;
+        });
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleWatermarkText();
+
+        // Add event listener for file input
+        document.getElementById('images').addEventListener('change', handleFileSelect);
+
+        // Add event listener for form submission
+        document.querySelector('form').addEventListener('submit', function() {
+            // Make sure the image order is updated before submission
+            updateImageOrder();
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,172 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Edit Custom Reference{% endblock %}
+
+{% block content %}
+<h1>Edit Custom Reference</h1>
+<p>Update custom reference link details and included references.</p>
+
+<div class="dashboard-actions">
+    <a href="{{ url_for('dashboard_custom_references') }}" class="btn">Back to Custom References</a>
+    <a href="{{ url_for('custom_reference', link_id=custom_ref.link_id) }}" class="btn" target="_blank">View Custom Reference</a>
+</div>
+
+<div class="custom-ref-info">
+    <p>Link ID: <code>{{ custom_ref.link_id }}</code></p>
+    <p>Creation Date: {{ custom_ref.creation_date.strftime('%Y-%m-%d') }}</p>
+    <p>Full URL: <code>{{ url_for('custom_reference', link_id=custom_ref.link_id, _external=True) }}</code></p>
+    <button id="copy-link" class="btn" data-link="{{ url_for('custom_reference', link_id=custom_ref.link_id, _external=True) }}">Copy Link</button>
+</div>
+
+<form method="POST" action="{{ url_for('dashboard_edit_custom_reference', custom_ref_id=custom_ref.id) }}">
+    <div class="form-group">
+        <label for="name">Custom Reference Name:</label>
+        <input type="text" id="name" name="name" class="form-control" value="{{ custom_ref.name }}" required>
+    </div>
+    
+    <div class="form-group">
+        <label>Select References to Include:</label>
+        <div class="selected-count">Selected: <span id="selected-count">0</span></div>
+        
+        <div class="filter-controls">
+            <div class="form-group">
+                <label for="category-filter">Filter by Category:</label>
+                <select id="category-filter" class="form-control">
+                    <option value="">All Categories</option>
+                    {% for ref in all_references %}
+                        {% if loop.first or all_references[loop.index0 - 1].category != ref.category %}
+                            <option value="{{ ref.category }}">{{ ref.category }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="folder-filter">Filter by Folder:</label>
+                <select id="folder-filter" class="form-control">
+                    <option value="">All Folders</option>
+                    {% for ref in all_references %}
+                        {% if loop.first or all_references[loop.index0 - 1].folder != ref.folder %}
+                            <option value="{{ ref.folder }}">{{ ref.folder }}</option>
+                        {% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <div class="reference-selection">
+        {% if all_references %}
+            <div class="reference-grid">
+                {% for ref in all_references %}
+                <div class="reference-item" data-category="{{ ref.category }}" data-folder="{{ ref.folder }}">
+                    <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" style="max-width: 150px; max-height: 150px;">
+                    <div class="reference-info">
+                        <p>{{ ref.category }} / {{ ref.folder }}</p>
+                        <label>
+                            <input type="checkbox" name="references" value="{{ ref.id }}" class="reference-checkbox" {% if ref.id in selected_refs %}checked{% endif %}>
+                            Include
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No references available. Please add some references first.</p>
+        {% endif %}
+    </div>
+    
+    <div class="form-group">
+        <button type="submit" class="btn">Update Custom Reference</button>
+    </div>
+</form>
+
+<div class="danger-zone">
+    <h3>Danger Zone</h3>
+    <form method="POST" action="{{ url_for('dashboard_delete_custom_reference', custom_ref_id=custom_ref.id) }}" onsubmit="return confirm('Are you sure you want to delete this custom reference? This action cannot be undone.');">
+        <button type="submit" class="btn btn-danger">Delete Custom Reference</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const categoryFilter = document.getElementById('category-filter');
+        const folderFilter = document.getElementById('folder-filter');
+        const referenceItems = document.querySelectorAll('.reference-item');
+        const checkboxes = document.querySelectorAll('.reference-checkbox');
+        const selectedCount = document.getElementById('selected-count');
+        const copyButton = document.getElementById('copy-link');
+        
+        // Update selected count
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.reference-checkbox:checked').length;
+            selectedCount.textContent = count;
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            const categoryValue = categoryFilter.value;
+            const folderValue = folderFilter.value;
+            
+            referenceItems.forEach(item => {
+                const categoryMatch = !categoryValue || item.getAttribute('data-category') === categoryValue;
+                const folderMatch = !folderValue || item.getAttribute('data-folder') === folderValue;
+                
+                if (categoryMatch && folderMatch) {
+                    item.style.display = '';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+        
+        // Copy link functionality
+        copyButton.addEventListener('click', function() {
+            const link = this.getAttribute('data-link');
+            
+            // Create a temporary input element
+            const tempInput = document.createElement('input');
+            tempInput.value = link;
+            document.body.appendChild(tempInput);
+            
+            // Select and copy the text
+            tempInput.select();
+            document.execCommand('copy');
+            
+            // Remove the temporary element
+            document.body.removeChild(tempInput);
+            
+            // Update button text temporarily
+            const originalText = this.textContent;
+            this.textContent = 'Copied!';
+            
+            setTimeout(() => {
+                this.textContent = originalText;
+            }, 2000);
+        });
+        
+        // Add event listeners
+        categoryFilter.addEventListener('change', applyFilters);
+        folderFilter.addEventListener('change', applyFilters);
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateSelectedCount);
+        });
+        
+        // Form validation
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(e) {
+            const checkedCount = document.querySelectorAll('.reference-checkbox:checked').length;
+            if (checkedCount === 0) {
+                e.preventDefault();
+                alert('Please select at least one reference image.');
+            }
+        });
+        
+        // Initialize
+        updateSelectedCount();
+    });
+</script>
+{% endblock %}

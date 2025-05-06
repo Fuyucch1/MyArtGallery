@@ -1,0 +1,84 @@
+{% extends 'layout.html' %}
+
+{% block title %}{{ site_title }} - Custom References{% endblock %}
+
+{% block content %}
+<h1>Manage Custom References</h1>
+<p>View, add, edit, and delete custom reference links.</p>
+
+<div class="dashboard-actions">
+    <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
+    <a href="{{ url_for('dashboard_add_custom_reference') }}" class="btn">Create New Custom Reference</a>
+</div>
+
+{% if custom_refs %}
+<table>
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Link ID</th>
+            <th>References</th>
+            <th>Creation Date</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ref in custom_refs %}
+        <tr>
+            <td>{{ ref.name }}</td>
+            <td>
+                <code>{{ url_for('custom_reference', link_id=ref.link_id, _external=True) }}</code>
+            </td>
+            <td>{{ ref.ref_count }}</td>
+            <td>{{ ref.creation_date.strftime('%Y-%m-%d') }}</td>
+            <td class="action-buttons">
+                <button class="copy-btn btn-icon" data-link="{{ url_for('custom_reference', link_id=ref.link_id, _external=True) }}" title="Copy"><i class="fas fa-copy"></i></button>
+                <a href="{{ url_for('custom_reference', link_id=ref.link_id) }}" class="btn btn-icon" target="_blank" title="View"><i class="fas fa-eye"></i></a>
+                <a href="{{ url_for('dashboard_edit_custom_reference', custom_ref_id=ref.id) }}" class="btn btn-icon" title="Edit"><i class="fas fa-edit"></i></a>
+                <form method="POST" action="{{ url_for('dashboard_delete_custom_reference', custom_ref_id=ref.id) }}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete this custom reference?');" style="display: inline;">
+                    <button type="submit" class="btn btn-danger btn-icon" title="Delete"><i class="fas fa-trash"></i></button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No custom references available.</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add click event listeners to copy buttons
+        document.querySelectorAll('.copy-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const link = this.getAttribute('data-link');
+
+                // Create a temporary input element
+                const tempInput = document.createElement('input');
+                tempInput.value = link;
+                document.body.appendChild(tempInput);
+
+                // Select and copy the text
+                tempInput.select();
+                document.execCommand('copy');
+
+                // Remove the temporary element
+                document.body.removeChild(tempInput);
+
+                // Update button icon temporarily
+                const icon = this.querySelector('i');
+                icon.classList.remove('fa-copy');
+                icon.classList.add('fa-check');
+
+                setTimeout(() => {
+                    icon.classList.remove('fa-check');
+                    icon.classList.add('fa-copy');
+                }, 2000);
+            });
+        });
+    });
+</script>
+{% endblock %}
