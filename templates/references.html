@@ -69,8 +69,6 @@
             <div class="reference-grid">
                 {% for ref in refs %}
                 <div class="reference-item" data-id="{{ ref.id }}" data-category="{{ ref.category }}" data-subcategory="{{ ref.subcategory }}">
-                    <div class="reference-name">{{ ref.name if ref.name else (ref.filename.split('_', 1)[1] if '_' in ref.filename else ref.filename) }}</div>
-                    <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" class="reference-image">
                     <div class="reference-actions">
                         <div class="action-icons">
                             <a href="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" download class="icon-btn download-icon" title="Download">
@@ -89,6 +87,8 @@
                             </label>
                         </div>
                     </div>
+                    <div class="reference-name">{{ ref.name if ref.name else (ref.filename.split('_', 1)[1] if '_' in ref.filename else ref.filename) }}</div>
+                    <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" class="reference-image">
                     {% if ref.description %}
                     <div class="reference-description" style="display: none;">{{ ref.description }}</div>
                     {% endif %}
