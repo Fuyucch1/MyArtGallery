@@ -1,6 +1,41 @@
 from PIL import Image, ImageDraw, ImageFont
 import math
-import os
+import os, platform
+
+# Get Fonts
+
+def get_font(font_size):
+    # Common font paths by platform
+    font_paths = []
+
+    system = platform.system()
+    if system == "Windows":
+        font_paths = [
+            "C:\\Windows\\Fonts\\arial.ttf",
+            "C:\\Windows\\Fonts\\verdana.ttf"
+        ]
+    elif system == "Darwin":  # macOS
+        font_paths = [
+            "/System/Library/Fonts/Supplemental/Arial.ttf",
+            "/System/Library/Fonts/Supplemental/Verdana.ttf"
+        ]
+    else:  # Linux
+        font_paths = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
+        ]
+
+    # Try loading fonts in order of preference
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, font_size)
+            except IOError:
+                continue
+
+    # Fallback
+    return ImageFont.load_default()
 
 # Create miniature version of image in webp format
 def create_miniature(image_path, output_dir=None, max_size=300):
@@ -59,10 +94,7 @@ def add_watermark(image_path, output_path, watermark_text=None):
         font_size = max(24, min(72, int(img.width * base_font_size / base_image_width)))
 
         # Try to load a font with the calculated size, use default if not available
-        try:
-            font = ImageFont.truetype("arial.ttf", font_size)
-        except IOError:
-            font = ImageFont.load_default()
+        font = get_font(font_size)
 
         # Use provided watermark text or default
         if not watermark_text:
