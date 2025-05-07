@@ -119,7 +119,7 @@
         // Function to assign size class based on image orientation
         function assignSizeClass(img, item) {
             // Check if image is landscape (width > height)
-            const isLandscape = img.naturalWidth > img.naturalHeight;
+            const isLandscape = img.naturalWidth / img.naturalHeight > 1.33;
 
             if (isLandscape) {
                 // For landscape images, check if height at 100% width would exceed 80% of viewport height
@@ -128,12 +128,12 @@
                 const heightAt100PercentWidth = window.innerWidth * aspectRatio;
 
                 if (heightAt100PercentWidth > viewportHeight * 0.8) {
-                    // If height would exceed 80% of viewport height, select large size (75%)
+                    // If height would exceed 80% of viewport height, select medium size (50%)
 
                     item.classList.add('large-size');
                 } else {
-                    // Otherwise, landscape images take medium size to allow side-by-side display
-                    item.classList.add('medium-size');
+                    // Otherwise, landscape images take full size to allow side-by-side display
+                    item.classList.add('full-width');
                 }
             } else {
                 // Portrait or square images take medium size (33.333%)
