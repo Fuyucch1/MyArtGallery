@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageChops
 import math
 import os, platform
 
@@ -36,6 +36,29 @@ def get_font(font_size):
 
     # Fallback
     return ImageFont.load_default()
+
+# Draw outline text on image
+def draw_outline_text_hollow(base_img, position, text, font, outline_color, thickness=2):
+    # Create a temporary image for drawing the outline
+    txt = Image.new('RGBA', base_img.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(txt)
+
+    x, y = position
+
+    # Draw text multiple times for the outline
+    for dx in range(-thickness, thickness + 1):
+        for dy in range(-thickness, thickness + 1):
+            if dx != 0 or dy != 0:
+                draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
+
+    # Draw the center text in transparent to "erase" it
+    erase = Image.new('L', base_img.size, 0)
+    erase_draw = ImageDraw.Draw(erase)
+    erase_draw.text(position, text, font=font, fill=255)
+    txt.putalpha(ImageChops.subtract(txt.getchannel('A'), erase))
+
+    # Composite the outline onto the base image
+    base_img.alpha_composite(txt)
 
 # Create miniature version of image in webp format
 def create_miniature(image_path, output_dir=None, max_size=300):
@@ -78,86 +101,61 @@ def create_miniature(image_path, output_dir=None, max_size=300):
 # Add watermark to image
 def add_watermark(image_path, output_path, watermark_text=None):
     try:
-        # Open the original image
         img = Image.open(image_path)
-
-        # Create a transparent overlay for the watermarks
         overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
 
-        # Calculate font size based on image dimensions
-        # Use a base size of 36 for a 1000px wide image, and scale proportionally
         base_font_size = 36
         base_image_width = 1000
-
-        # Calculate font size as a percentage of image width, with min and max limits
         font_size = max(24, min(72, int(img.width * base_font_size / base_image_width)))
-
-        # Try to load a font with the calculated size, use default if not available
         font = get_font(font_size)
 
-        # Use provided watermark text or default
         if not watermark_text:
             watermark_text = "DO NOT USE FOR AI TRAINING"
 
-        # Get text dimensions using textbbox (newer method) instead of textsize
-        # textbbox returns (left, top, right, bottom)
         bbox = draw.textbbox((0, 0), watermark_text, font=font)
         text_width = bbox[2] - bbox[0]
         text_height = bbox[3] - bbox[1]
 
-        # Calculate spacing for the grid of watermarks - use smaller spacing for more consistent coverage
-        # Scale spacing based on font size to maintain proper density of watermarks
-        spacing_x = text_width * 3  # Increased to accommodate the new middle column
-        spacing_y = text_height * 2.5  # Increased vertical spacing between watermarks
+        spacing_x = text_width * 3
+        spacing_y = text_height * 2.5
 
-        # Calculate how many watermarks we need in each direction
-        # Add extra watermarks to ensure full coverage
         num_x = math.ceil(img.width / spacing_x) + 2
-        num_y = math.ceil(img.height / spacing_y) + 6  # Further increased to ensure full height coverage including top
+        num_y = math.ceil(img.height / spacing_y) + 6
 
-        # Create rotated text images for better performance
-        # Create temporary images to draw the rotated texts
         txt_img = Image.new('RGBA', (text_width * 2, text_height * 2), (0, 0, 0, 0))
-        txt_draw = ImageDraw.Draw(txt_img)
 
-        # Draw the text in the center of the temporary image
-        # Use 128 for alpha to make it exactly half see-through (50% opacity)
-        txt_draw.text((text_width // 2, text_height // 2), watermark_text, fill=(255, 255, 255, 128), font=font)
+        draw_outline_text_hollow(
+            txt_img,
+            (text_width // 2, text_height // 2),
+            watermark_text,
+            font,
+            outline_color=(128, 128, 128, 128),
+            thickness=2
+        )
 
-        # Create rotated text images at 30° and -30°
         rotated_txt_pos = txt_img.rotate(30, expand=1)
         rotated_txt_neg = txt_img.rotate(-30, expand=1)
 
-        # Draw the watermark grid
         for i in range(num_y):
             for j in range(num_x):
-                # Calculate position for a uniform grid pattern
-                # Start from negative offset to ensure coverage of the edges
                 base_x = j * spacing_x - text_width
-                y = i * spacing_y - text_height
+                y = i * spacing_y - (spacing_y * 3)
 
-                # Create three columns of watermarks with alternating rotations
-                # First column (30° rotation)
                 x = int(base_x)
                 overlay.paste(rotated_txt_pos, (x, int(y)), rotated_txt_pos)
 
-                # Middle column (-30° rotation)
                 x = int(base_x + spacing_x // 3)
                 overlay.paste(rotated_txt_neg, (x, int(y)), rotated_txt_neg)
 
-                # Third column (30° rotation)
                 x = int(base_x + 2 * (spacing_x // 3))
                 overlay.paste(rotated_txt_pos, (x, int(y)), rotated_txt_pos)
 
-        # Convert the original image to RGBA if it's not already
         if img.mode != 'RGBA':
             img = img.convert('RGBA')
 
-        # Composite the overlay onto the original image
         watermarked = Image.alpha_composite(img, overlay)
 
-        # Convert back to RGB if needed and save
         if watermarked.mode == 'RGBA':
             watermarked = watermarked.convert('RGB')
 
