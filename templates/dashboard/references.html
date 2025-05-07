@@ -9,28 +9,35 @@
 <div class="dashboard-actions">
     <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
     <a href="{{ url_for('dashboard_add_reference') }}" class="btn">Add New Reference</a>
+    <a href="{{ url_for('dashboard_generate_miniatures') }}" class="btn" title="Generate miniature versions of all references for faster loading">Generate Miniatures</a>
 </div>
 
 <div class="filter-controls">
     <h3>Filter References</h3>
     <div class="form-group">
         <label for="category-filter">Category:</label>
-        <select id="category-filter" class="form-control">
-            <option value="">All Categories</option>
-            {% for category in categories %}
-            <option value="{{ category }}">{{ category }}</option>
-            {% endfor %}
-        </select>
+        <div class="filter-with-action">
+            <select id="category-filter" class="form-control">
+                <option value="">All Categories</option>
+                {% for category in categories %}
+                <option value="{{ category }}">{{ category }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" id="rename-category-btn" class="btn btn-sm" title="Rename Selected Category"><i class="fas fa-edit"></i> Rename</button>
+        </div>
     </div>
 
     <div class="form-group">
         <label for="folder-filter">Subcategory:</label>
-        <select id="folder-filter" class="form-control">
-            <option value="">All Subcategories</option>
-            {% for folder in folders %}
-            <option value="{{ folder }}">{{ folder }}</option>
-            {% endfor %}
-        </select>
+        <div class="filter-with-action">
+            <select id="folder-filter" class="form-control">
+                <option value="">All Subcategories</option>
+                {% for folder in folders %}
+                <option value="{{ folder }}">{{ folder }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" id="rename-subcategory-btn" class="btn btn-sm" title="Rename Selected Subcategory"><i class="fas fa-edit"></i> Rename</button>
+        </div>
     </div>
 
     <div class="form-group">
@@ -80,6 +87,59 @@
 {% else %}
 <p>No references available.</p>
 {% endif %}
+<!-- Rename Category Modal -->
+<div id="rename-category-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Rename Category</h2>
+        <form id="rename-category-form">
+            <div class="form-group">
+                <label for="old-category">Current Category:</label>
+                <input type="text" id="old-category" name="old_category" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+                <label for="new-category">New Category Name:</label>
+                <input type="text" id="new-category" name="new_category" class="form-control" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">Rename</button>
+                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Rename Subcategory Modal -->
+<div id="rename-subcategory-modal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2>Rename Subcategory</h2>
+        <form id="rename-subcategory-form">
+            <div class="form-group">
+                <label for="category-for-subcategory">In Category:</label>
+                <select id="category-for-subcategory" name="category" class="form-control">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}
+                    <option value="{{ category }}">{{ category }}</option>
+                    {% endfor %}
+                </select>
+                <small>Leave as "All Categories" to rename this subcategory across all categories.</small>
+            </div>
+            <div class="form-group">
+                <label for="old-subcategory">Current Subcategory:</label>
+                <input type="text" id="old-subcategory" name="old_subcategory" class="form-control" readonly>
+            </div>
+            <div class="form-group">
+                <label for="new-subcategory">New Subcategory Name:</label>
+                <input type="text" id="new-subcategory" name="new_subcategory" class="form-control" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">Rename</button>
+                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -89,6 +149,24 @@
         const folderFilter = document.getElementById('folder-filter');
         const visibilityFilter = document.getElementById('visibility-filter');
         const rows = document.querySelectorAll('#references-table tbody tr');
+
+        // Rename category elements
+        const renameCategoryBtn = document.getElementById('rename-category-btn');
+        const renameCategoryModal = document.getElementById('rename-category-modal');
+        const renameCategoryForm = document.getElementById('rename-category-form');
+        const oldCategoryInput = document.getElementById('old-category');
+        const newCategoryInput = document.getElementById('new-category');
+
+        // Rename subcategory elements
+        const renameSubcategoryBtn = document.getElementById('rename-subcategory-btn');
+        const renameSubcategoryModal = document.getElementById('rename-subcategory-modal');
+        const renameSubcategoryForm = document.getElementById('rename-subcategory-form');
+        const categoryForSubcategorySelect = document.getElementById('category-for-subcategory');
+        const oldSubcategoryInput = document.getElementById('old-subcategory');
+        const newSubcategoryInput = document.getElementById('new-subcategory');
+
+        // Close buttons
+        const closeButtons = document.querySelectorAll('.close, .close-modal');
 
         function applyFilters() {
             const categoryValue = categoryFilter.value;
@@ -108,6 +186,123 @@
             });
         }
 
+        // Open rename category modal
+        renameCategoryBtn.addEventListener('click', function() {
+            const selectedCategory = categoryFilter.value;
+            if (!selectedCategory) {
+                alert('Please select a category to rename.');
+                return;
+            }
+
+            oldCategoryInput.value = selectedCategory;
+            newCategoryInput.value = '';
+            renameCategoryModal.style.display = 'block';
+        });
+
+        // Open rename subcategory modal
+        renameSubcategoryBtn.addEventListener('click', function() {
+            const selectedSubcategory = folderFilter.value;
+            if (!selectedSubcategory) {
+                alert('Please select a subcategory to rename.');
+                return;
+            }
+
+            oldSubcategoryInput.value = selectedSubcategory;
+            newSubcategoryInput.value = '';
+
+            // If a category is selected in the filter, pre-select it in the modal
+            categoryForSubcategorySelect.value = categoryFilter.value;
+
+            renameSubcategoryModal.style.display = 'block';
+        });
+
+        // Close modals
+        closeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                renameCategoryModal.style.display = 'none';
+                renameSubcategoryModal.style.display = 'none';
+            });
+        });
+
+        // Handle rename category form submission
+        renameCategoryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const oldCategory = oldCategoryInput.value;
+            const newCategory = newCategoryInput.value;
+
+            if (!oldCategory || !newCategory) {
+                alert('Both old and new category names are required.');
+                return;
+            }
+
+            // Send AJAX request to rename category
+            const formData = new FormData();
+            formData.append('old_category', oldCategory);
+            formData.append('new_category', newCategory);
+
+            fetch('/dashboard/rename_category', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Reload the page to update the category list
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while renaming the category.');
+            });
+        });
+
+        // Handle rename subcategory form submission
+        renameSubcategoryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const oldSubcategory = oldSubcategoryInput.value;
+            const newSubcategory = newSubcategoryInput.value;
+            const category = categoryForSubcategorySelect.value;
+
+            if (!oldSubcategory || !newSubcategory) {
+                alert('Both old and new subcategory names are required.');
+                return;
+            }
+
+            // Send AJAX request to rename subcategory
+            const formData = new FormData();
+            formData.append('old_subcategory', oldSubcategory);
+            formData.append('new_subcategory', newSubcategory);
+            if (category) {
+                formData.append('category', category);
+            }
+
+            fetch('/dashboard/rename_subcategory', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    // Reload the page to update the subcategory list
+                    window.location.reload();
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An error occurred while renaming the subcategory.');
+            });
+        });
+
+        // Filter event listeners
         categoryFilter.addEventListener('change', applyFilters);
         folderFilter.addEventListener('change', applyFilters);
         visibilityFilter.addEventListener('change', applyFilters);

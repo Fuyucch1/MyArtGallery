@@ -88,7 +88,14 @@
                         </div>
                     </div>
                     <div class="reference-name">{{ ref.name if ref.name else (ref.filename.split('_', 1)[1] if '_' in ref.filename else ref.filename) }}</div>
-                    <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" class="reference-image">
+                    {% set filename_parts = ref.filename.split('.') %}
+                    {% set filename_base = '.'.join(filename_parts[:-1]) if filename_parts|length > 1 else ref.filename %}
+                    {% set miniature_path = 'uploads/references/' + filename_base + '_miniature.webp' %}
+                    {% set original_path = 'uploads/references/' + ref.filename %}
+                    <img src="{{ url_for('static', filename=miniature_path) }}" 
+                         alt="Reference" 
+                         class="reference-image"
+                         data-original="{{ url_for('static', filename=original_path) }}">
                     {% if ref.description %}
                     <div class="reference-description" style="display: none;">{{ ref.description }}</div>
                     {% endif %}
@@ -294,7 +301,8 @@
                     return;
                 }
 
-                const imgSrc = this.querySelector('img').src;
+                const imgElement = this.querySelector('img');
+                const imgSrc = imgElement.getAttribute('data-original') || imgElement.src;
                 const category = this.getAttribute('data-category');
                 const subcategory = this.getAttribute('data-subcategory');
                 const name = this.querySelector('.reference-name').textContent;
@@ -304,7 +312,18 @@
 
                 modalImage.src = imgSrc;
                 modalName.textContent = name;
-                modalCategorySubcategory.innerHTML = "Category: " + category + "<br>Sub-Category: " + subcategory;
+
+                // Only show category and subcategory if they're not empty
+                let categorySubcategoryHTML = "";
+                if (category && category.trim()) {
+                    categorySubcategoryHTML += "Category: " + category;
+                }
+                if (subcategory && subcategory.trim()) {
+                    if (categorySubcategoryHTML) categorySubcategoryHTML += "<br>";
+                    categorySubcategoryHTML += "Sub-Category: " + subcategory;
+                }
+                modalCategorySubcategory.innerHTML = categorySubcategoryHTML;
+
                 modalDescription.textContent = description;
                 modalDownload.href = imgSrc;
 

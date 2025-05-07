@@ -165,6 +165,36 @@ def dashboard():
                           artist_count=counts['artist_count'],
                           custom_ref_count=counts['custom_ref_count'])
 
+@app.route('/dashboard/generate_miniatures', methods=['GET'])
+def dashboard_generate_miniatures():
+    if not is_authenticated():
+        return redirect(url_for('login'))
+
+    # Get all references
+    references = db.get_all_references()
+    count = 0
+
+    # Generate miniatures for each reference
+    for ref in references:
+        filename = ref['filename']
+        file_path = os.path.join('static/uploads/references', filename)
+
+        # Check if file exists
+        if os.path.exists(file_path):
+            # Check if miniature already exists
+            filename_parts = filename.split('.')
+            filename_base = '.'.join(filename_parts[:-1]) if len(filename_parts) > 1 else filename
+            miniature_path = os.path.join('static/uploads/references', f"{filename_base}_miniature.webp")
+
+            if not os.path.exists(miniature_path):
+                # Create miniature
+                from utils import create_miniature
+                if create_miniature(file_path, 'static/uploads/references'):
+                    count += 1
+
+    flash(f'Generated {count} miniatures for existing references')
+    return redirect(url_for('dashboard_references'))
+
 @app.route('/dashboard/settings', methods=['GET', 'POST'])
 def dashboard_settings():
     if not is_authenticated():
@@ -194,6 +224,47 @@ def dashboard_references():
 
     return render_template('dashboard/references.html', site_title=site_title,
                           references=references, categories=categories, folders=folders)
+
+@app.route('/dashboard/rename_category', methods=['POST'])
+def dashboard_rename_category():
+    if not is_authenticated():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    old_category = request.form.get('old_category')
+    new_category = request.form.get('new_category')
+
+    if not old_category or not new_category:
+        return jsonify({'error': 'Both old and new category names are required'}), 400
+
+    # Rename the category
+    affected_rows = db.rename_category(old_category, new_category)
+
+    return jsonify({
+        'success': True,
+        'message': f'Category renamed successfully. {affected_rows} references updated.',
+        'affected_rows': affected_rows
+    })
+
+@app.route('/dashboard/rename_subcategory', methods=['POST'])
+def dashboard_rename_subcategory():
+    if not is_authenticated():
+        return jsonify({'error': 'Authentication required'}), 401
+
+    old_subcategory = request.form.get('old_subcategory')
+    new_subcategory = request.form.get('new_subcategory')
+    category = request.form.get('category')  # Optional
+
+    if not old_subcategory or not new_subcategory:
+        return jsonify({'error': 'Both old and new subcategory names are required'}), 400
+
+    # Rename the subcategory
+    affected_rows = db.rename_subcategory(old_subcategory, new_subcategory, category)
+
+    return jsonify({
+        'success': True,
+        'message': f'Subcategory renamed successfully. {affected_rows} references updated.',
+        'affected_rows': affected_rows
+    })
 
 @app.route('/dashboard/references/add', methods=['GET', 'POST'])
 def dashboard_add_reference():
@@ -242,6 +313,10 @@ def dashboard_add_reference():
                 if add_watermark(file_path, watermarked_path, watermark_text):
                     # Replace original with watermarked version
                     os.replace(watermarked_path, file_path)
+
+            # Create miniature version for faster loading in cards
+            from utils import create_miniature
+            create_miniature(file_path, 'static/uploads/references')
 
             # Save to database
             db.add_reference(filename, name, category, subcategory, description, public, watermark)
@@ -299,6 +374,13 @@ def dashboard_delete_reference(ref_id):
         # Delete file if it exists
         if os.path.exists(file_path):
             os.remove(file_path)
+
+        # Delete miniature if it exists
+        filename_parts = filename.split('.')
+        filename_base = '.'.join(filename_parts[:-1]) if len(filename_parts) > 1 else filename
+        miniature_path = os.path.join('static/uploads/references', f"{filename_base}_miniature.webp")
+        if os.path.exists(miniature_path):
+            os.remove(miniature_path)
 
         flash('Reference deleted successfully')
     else:

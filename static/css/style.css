@@ -1685,3 +1685,18 @@ table tr:hover {
 .image-item:first-child .image-index {
   background-color: var(--accent-color);
 }
+
+/* Styles for category/subcategory rename functionality */
+.filter-with-action {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-with-action select {
+    flex-grow: 1;
+}
+
+.filter-with-action button {
+    white-space: nowrap;
+}

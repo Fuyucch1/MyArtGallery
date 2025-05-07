@@ -694,6 +694,48 @@ def update_commission_image_order(image_orders):
         return False
 
 # Dashboard related functions
+def rename_category(old_category, new_category):
+    """
+    Rename a category across all references.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE [references] 
+        SET category = ?
+        WHERE category = ?
+    ''', (new_category, old_category))
+    affected_rows = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected_rows
+
+def rename_subcategory(old_subcategory, new_subcategory, category=None):
+    """
+    Rename a subcategory across all references.
+    If category is provided, only rename subcategories within that category.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if category:
+        cursor.execute('''
+            UPDATE [references] 
+            SET subcategory = ?
+            WHERE subcategory = ? AND category = ?
+        ''', (new_subcategory, old_subcategory, category))
+    else:
+        cursor.execute('''
+            UPDATE [references] 
+            SET subcategory = ?
+            WHERE subcategory = ?
+        ''', (new_subcategory, old_subcategory))
+
+    affected_rows = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return affected_rows
+
 def get_dashboard_counts():
     conn = get_db_connection()
     cursor = conn.cursor()
