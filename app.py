@@ -123,7 +123,7 @@ def custom_reference(link_id):
 def commissions():
     site_title = db.get_site_title()
     commissions = db.get_public_commissions()
-    return render_template('commissions.html', site_title=site_title, commissions=reversed(commissions))
+    return render_template('commissions.html', site_title=site_title, commissions=commissions)
 
 @app.route('/commission/<int:commission_id>')
 def commission_detail(commission_id):
