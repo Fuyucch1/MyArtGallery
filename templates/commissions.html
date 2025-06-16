@@ -210,11 +210,13 @@
 
         closeBtn.addEventListener('click', function() {
             modal.style.display = 'none';
+            document.body.classList.remove('modal-open');
         });
 
         window.addEventListener('click', function(e) {
             if (e.target === modal) {
                 modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
             }
         });
     });
@@ -223,6 +225,7 @@
         // Show loading state
         const modal = document.getElementById('commission-modal');
         modal.style.display = 'block';
+        document.body.classList.add('modal-open');
         document.getElementById('modal-title').textContent = 'Loading...';
 
         // Fetch commission details
@@ -232,6 +235,7 @@
                 if (data.error) {
                     alert(data.error);
                     modal.style.display = 'none';
+                    document.body.classList.remove('modal-open');
                     return;
                 }
 
@@ -242,6 +246,7 @@
                 console.error('Error:', error);
                 alert('An error occurred while loading the commission details.');
                 modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
             });
     }
 
