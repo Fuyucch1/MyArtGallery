@@ -817,6 +817,56 @@ footer {
     opacity: 1;
 }
 
+/* Commission overlay with title, artist name, and social links */
+.commission-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0.6) 60%, rgba(0,0,0,0) 100%);
+    padding: 15px;
+    color: white;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 3;
+    box-sizing: border-box;
+}
+
+.modern-commission-item:hover .commission-overlay {
+    opacity: 1;
+}
+
+.commission-overlay h3 {
+    margin: 0 0 5px 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.commission-overlay p {
+    margin: 0 0 10px 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.commission-overlay .social-links {
+    margin-top: 8px;
+    max-height: 80px;
+    overflow-y: auto;
+}
+
+.commission-overlay .social-link {
+    background-color: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    font-size: 0.8rem;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+}
+
+.commission-overlay .social-link i {
+    color: rgba(255, 255, 255, 0.8);
+}
+
 .modern-commission-image {
     width: 100%;
     height: auto;
@@ -1457,6 +1507,35 @@ table tr:hover {
 .home-section .btn {
     width: 100%;
     text-align: center;
+}
+
+/* Back button styling */
+.back-link {
+    margin: 30px 0;
+    text-align: left;
+}
+
+.btn-back {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--primary-color);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    font-weight: 500;
+}
+
+.btn-back:hover {
+    background-color: var(--secondary-color);
+    transform: translateX(-5px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-back i {
+    margin-right: 8px;
+    font-size: 1.1em;
 }
 
 /* Social links styling */

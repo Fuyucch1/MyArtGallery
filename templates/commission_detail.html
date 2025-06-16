@@ -94,7 +94,9 @@
     </div>
 
     <div class="back-link">
-        <a href="{{ url_for('commissions') }}" class="btn">Back to All Commissions</a>
+        <a href="{{ url_for('commissions') }}" class="btn btn-back">
+            <i class="fas fa-arrow-left"></i>Back to All Commissions
+        </a>
     </div>
 </div>
 {% endblock %}
@@ -137,6 +139,104 @@
             }
         });
     }
+
+    // Update social links if available
+        const socialLinksContainer = document.getElementById('modal-social-links-container');
+        if (commission.social_links) {
+            const socialLinksElement = document.getElementById('modal-social-links');
+            socialLinksElement.innerHTML = '';
+            socialLinksElement.className = 'social-links';
+
+            // Parse social links and create clickable links
+            const links = commission.social_links.split(/[,\n]+/).map(link => link.trim()).filter(link => link);
+
+            links.forEach(link => {
+                // Check if it's a URL or just text
+                if (link.match(/^https?:\/\//i) || link.match(/^www\./i)) {
+                    // It's a URL - create a link with appropriate icon
+                    const a = document.createElement('a');
+                    a.href = link.match(/^https?:\/\//i) ? link : `https://${link}`;
+                    a.target = '_blank';
+                    a.className = 'social-link generic';
+
+                    // Determine icon based on URL
+                    let icon = 'fa-globe';
+                    let platform = 'generic';
+
+                    a.className = `social-link ${platform}`;
+
+                    // Create icon
+                    const i = document.createElement('i');
+                    i.className = `fas ${icon}`;
+                    a.appendChild(i);
+
+                    // Create text
+                    const displayText = link.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
+                    const span = document.createElement('span');
+                    span.textContent = displayText;
+                    a.appendChild(span);
+
+                    socialLinksElement.appendChild(a);
+                } else if (link.includes(':')) {
+                    // It's in format "Platform: handle"
+                    const [platform, handle] = link.split(':').map(part => part.trim());
+
+                    // Determine platform details
+                    let url = null;
+                    let icon = 'fa-globe';
+                    let platformClass = 'generic';
+
+                    // Create link element
+                    const a = document.createElement('a');
+                    a.className = `social-link ${platformClass}`;
+
+                    if (url) {
+                        a.href = url;
+                        a.target = '_blank';
+
+                        // Add icon
+                        const i = document.createElement('i');
+                        i.className = `fab ${icon}`;
+                        a.appendChild(i);
+
+                        // Add display text
+                        const displayText = platform + ': ' + handle;
+                        const span = document.createElement('span');
+                        span.textContent = displayText;
+                        a.appendChild(span);
+                    } else {
+                        // No URL could be determined, just show as text with generic icon
+                        const i = document.createElement('i');
+                        i.className = 'fas fa-link';
+                        a.appendChild(i);
+
+                        const span = document.createElement('span');
+                        span.textContent = link;
+                        a.appendChild(span);
+                    }
+
+                    socialLinksElement.appendChild(a);
+                } else {
+                    // Just text - create a non-clickable styled element
+                    const div = document.createElement('div');
+                    div.className = 'social-link generic';
+
+                    const i = document.createElement('i');
+                    i.className = 'fas fa-info-circle';
+                    div.appendChild(i);
+
+                    const span = document.createElement('span');
+                    span.textContent = link;
+                    div.appendChild(span);
+
+                    socialLinksElement.appendChild(div);
+                }
+            });
+
+            socialLinksContainer.style.display = '';
+        } else {
+            socialLinksContainer.style.display = 'none';
+        }
 
     function nextSlide() {
         showSlide(currentSlide + 1);
