@@ -45,7 +45,12 @@ def index():
         return redirect(url_for('setup'))
 
     site_title = db.get_site_title()
-    return render_template('index.html', site_title=site_title)
+    # Fetch a few recent public commissions to feature on the homepage
+    try:
+        featured_commissions = db.get_public_commissions()[:10]
+    except Exception:
+        featured_commissions = []
+    return render_template('index.html', site_title=site_title, featured_commissions=featured_commissions)
 
 @app.route('/setup', methods=['GET', 'POST'])
 def setup():
