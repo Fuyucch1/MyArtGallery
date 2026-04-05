@@ -1,0 +1,252 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ site_title }} - Metrics{% endblock %}
+
+{% block content %}
+<style>
+  /* Make Bootstrap table colors theme-aware on this page */
+  .metrics-page{
+    --bs-table-color: var(--text);
+    --bs-table-striped-color: var(--text);
+    --bs-table-active-color: var(--text);
+    --bs-table-hover-color: var(--text);
+
+    --bs-table-bg: color-mix(in srgb, #000 6%, var(--card));
+    --bs-table-striped-bg: color-mix(in srgb, #000 12%, var(--card));
+    --bs-table-active-bg: color-mix(in srgb, var(--brand) 10%, var(--card));
+    --bs-table-hover-bg: color-mix(in srgb, var(--brand-2) 8%, var(--card));
+
+    --bs-table-border-color: var(--border);
+  }
+
+  /* Ensure table header and borders look right in both themes */
+  .metrics-page .table{ border-color: var(--border); }
+  .metrics-page .table thead th{
+    background: color-mix(in srgb, #000 10%, var(--card));
+    border-bottom-color: var(--border);
+  }
+
+  /* Force actual backgrounds (Bootstrap tables can come out white otherwise) */
+  .metrics-page .table{
+    background-color: color-mix(in srgb, #000 6%, var(--card)) !important;
+  }
+  .metrics-page .table > :not(caption) > * > *{
+    background-color: transparent; /* let row styles show */
+    border-color: var(--border);
+  }
+  .metrics-page .table-striped > tbody > tr:nth-of-type(odd) > *{
+    background-color: color-mix(in srgb, #000 12%, var(--card)) !important;
+  }
+
+  .metrics-page,
+  .metrics-page .card,
+  .metrics-page .card-body,
+  .metrics-page .card-header,
+  .metrics-page p,
+  .metrics-page small,
+  .metrics-page label,
+  .metrics-page th,
+  .metrics-page td,
+  .metrics-page code {
+    color: var(--text);
+  }
+  .metrics-page .text-secondary{ color: var(--muted) !important; }
+  .metrics-page code{ color: color-mix(in srgb, var(--brand-2) 70%, var(--text)); }
+</style>
+
+<div class="metrics-page">
+<section class="hero rounded-3 p-4 mb-4">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div>
+      <h1 class="mb-1">Metrics</h1>
+      <p class="mb-0" style="color: var(--muted);">Self-hosted, privacy-friendly pageview analytics.</p>
+    </div>
+
+    <form method="get" class="d-flex gap-2 align-items-center">
+      <label for="days" class="small" style="color: var(--muted);">Range</label>
+      <select class="form-select form-select-sm" id="days" name="days" style="width: 9rem;">
+        {% for opt in [1, 7, 14, 30, 90, 365] %}
+          <option value="{{ opt }}" {% if opt == days %}selected{% endif %}>Last {{ opt }} day{% if opt != 1 %}s{% endif %}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-contrast btn-sm" type="submit">Apply</button>
+      <a class="btn btn-outline-contrast btn-sm" href="{{ url_for('dashboard') }}">Back</a>
+    </form>
+  </div>
+</section>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card p-3 h-100">
+      <div class="small" style="color: var(--muted);">Pageviews</div>
+      <div class="h3 mb-0">{{ summary.totals.pageviews }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card p-3 h-100">
+      <div class="small" style="color: var(--muted);">Unique visitors</div>
+      <div class="h3 mb-0">{{ summary.totals.unique_visitors }}</div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card p-3 h-100">
+      <div class="small" style="color: var(--muted);">Notes</div>
+      <div class="small">Counts are based on a first-party cookie visitor id. Geo comes from the IP (best effort) and can be disabled by removing the lookup.</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header" style="background: transparent; border-bottom: 1px solid var(--border);">
+        <strong>Top pages</strong>
+      </div>
+      <div class="card-body">
+        {% if summary.top_pages %}
+          <div class="table-responsive">
+            <table class="table table-sm table-striped align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Path</th>
+                  <th class="text-end">Views</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in summary.top_pages %}
+                <tr>
+                  <td><code>{{ row.path }}</code></td>
+                  <td class="text-end">{{ row.c }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="small" style="color: var(--muted);">No data yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header" style="background: transparent; border-bottom: 1px solid var(--border);">
+        <strong>Top referrers</strong>
+      </div>
+      <div class="card-body">
+        {% if summary.top_referrers %}
+          <div class="table-responsive">
+            <table class="table table-sm table-striped align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Referrer</th>
+                  <th class="text-end">Views</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in summary.top_referrers %}
+                <tr>
+                  <td>
+                    {% if row.referrer %}
+                      <small style="word-break: break-all;">{{ row.referrer }}</small>
+                    {% else %}
+                      <span class="small" style="color: var(--muted);">(direct / none)</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">{{ row.c }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="small" style="color: var(--muted);">No data yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header" style="background: transparent; border-bottom: 1px solid var(--border);">
+        <strong>Top countries</strong>
+      </div>
+      <div class="card-body">
+        {% if summary.top_countries %}
+          <div class="table-responsive">
+            <table class="table table-sm table-striped align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Country</th>
+                  <th class="text-end">Views</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in summary.top_countries %}
+                <tr>
+                  <td>{{ row.country if row.country else '(unknown)' }}</td>
+                  <td class="text-end">{{ row.c }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="small" style="color: var(--muted);">No data yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
+    <div class="card">
+      <div class="card-header" style="background: transparent; border-bottom: 1px solid var(--border);">
+        <strong>Daily</strong>
+      </div>
+      <div class="card-body">
+        {% if summary.daily %}
+          <div class="table-responsive">
+            <table class="table table-sm table-striped align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Day</th>
+                  <th class="text-end">Views</th>
+                  <th class="text-end">Unique</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in summary.daily %}
+                <tr>
+                  <td><code>{{ row.day }}</code></td>
+                  <td class="text-end">{{ row.pageviews }}</td>
+                  <td class="text-end">{{ row.unique_visitors }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="small" style="color: var(--muted);">No data yet.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="{{ url_for('dashboard_metrics_cleanup') }}" class="mt-4">
+  <div class="card">
+    <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div>
+        <strong>Cleanup</strong>
+        <div class="small" style="color: var(--muted);">Delete old events to keep the database small.</div>
+      </div>
+      <div class="d-flex gap-2 align-items-center">
+        <input class="form-control form-control-sm" type="number" name="retain_days" min="7" max="3650" value="180" style="width: 8rem;" />
+        <button class="btn btn-outline-contrast btn-sm" type="submit">Delete older than (days)</button>
+      </div>
+    </div>
+  </div>
+</form>
+</div>
+{% endblock %}

@@ -1,56 +1,191 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
 {% block title %}{{ site_title }} - Manage Commissions{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"/>
+<style>
+  /* Table theming (dark-mode safe, same vibe as artists/references) */
+  .table-responsive{ background: var(--card) !important; }
+  .table,
+  .table thead,
+  .table tbody,
+  .table tfoot,
+  .table tr,
+  .table td,
+  .table th{
+    background-color: var(--card) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+  }
+  .table>:not(caption)>*>*{
+    background-color: inherit !important;
+    color: inherit !important;
+  }
+
+  .commissions-table thead th{
+    background: var(--card) !important;
+    border-bottom:1px solid var(--border) !important;
+    font-weight:600;
+  }
+  .commissions-table td,
+  .commissions-table th{
+    vertical-align: middle;
+  }
+
+  .thumb{
+    max-width:100px;
+    max-height:100px;
+    border-radius:.5rem;
+    border:1px solid var(--border);
+    object-fit:cover;
+  }
+  .thumb-empty{
+    width:100px;
+    height:100px;
+    border-radius:.5rem;
+    border:1px dashed var(--border);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:.8rem;
+    opacity:.8;
+  }
+
+  .status-pill{
+    display:inline-block;
+    padding:.125rem .5rem;
+    border-radius:999px;
+    border:1px solid var(--border);
+    font-size:.8rem;
+  }
+
+  .btn-brand{
+    color:#fff;
+    background:linear-gradient(90deg, var(--brand), var(--brand-2));
+    border:1px solid color-mix(in srgb, var(--brand) 45%, transparent);
+    box-shadow:0 6px 18px rgba(124,77,255,.25);
+  }
+  .btn-brand:hover{ filter:brightness(1.05); }
+
+  .btn-danger-soft{
+    background: color-mix(in srgb, #ef4444 12%, transparent);
+    color: color-mix(in srgb, #ef4444 90%, #fff);
+    border:1px solid color-mix(in srgb, #ef4444 35%, transparent);
+  }
+
+  .badge-empty{
+    opacity:.8;
+    border:1px dashed var(--border);
+    padding:.25rem .5rem;
+    border-radius:.5rem;
+  }
+
+  .action-gap{ gap:.4rem; }
+</style>
+{% endblock %}
+
 {% block content %}
-<h1>Manage Commissions</h1>
-<p>View, add, edit, and delete art commissions.</p>
 
-<div class="dashboard-actions">
-    <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
-    <a href="{{ url_for('dashboard_add_commission') }}" class="btn">Add New Commission</a>
-</div>
+<section class="hero rounded-3 p-4 mb-4 dash-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div>
+      <h1 class="mb-1">Manage Commissions</h1>
+      <p class="subtitle mb-0">View, add, edit, and delete art commissions.</p>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-outline-contrast btn-sm">
+        <i class="bi bi-layout-text-sidebar-reverse me-1"></i> Back to Dashboard
+      </a>
+      <a href="{{ url_for('dashboard_add_commission') }}" class="btn btn-brand btn-sm">
+        <i class="bi bi-brush me-1"></i> Add New Commission
+      </a>
+    </div>
+  </div>
+</section>
 
-{% if commissions %}
-<table>
-    <thead>
+<div class="card section-card p-0 overflow-hidden">
+  {% if commissions %}
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle commissions-table">
+      <thead>
         <tr>
-            <th>Thumbnail</th>
-            <th>Title</th>
-            <th>Artist</th>
-            <th>Date</th>
-            <th>Price</th>
-            <th>Visibility</th>
-            <th>Actions</th>
+          <th scope="col">Thumbnail</th>
+          <th scope="col">Title</th>
+          <th scope="col">Artist</th>
+          <th scope="col">Date</th>
+          <th scope="col">Price</th>
+          <th scope="col">Visibility</th>
+          <th scope="col" class="text-end">Actions</th>
         </tr>
-    </thead>
-    <tbody>
+      </thead>
+      <tbody>
         {% for commission in commissions %}
         <tr>
-            <td>
-                {% if commission.thumbnail %}
-                <img src="{{ url_for('static', filename='uploads/commissions/' + commission.thumbnail) }}" alt="{{ commission.title }}" style="max-width: 100px; max-height: 100px;">
-                {% else %}
-                <div class="no-image">No Image</div>
-                {% endif %}
-            </td>
-            <td>{{ commission.title }}</td>
-            <td>{{ commission.artist_name }}</td>
-            <td>{{ commission.commission_date.strftime('%Y-%m-%d') if commission.commission_date else 'N/A' }}</td>
-            <td>${{ commission.price if commission.price else 'N/A' }}</td>
-            <td>{{ 'Public' if commission.public else 'Private' }}</td>
-            <td class="action-buttons">
-                <a href="{{ url_for('commission_detail', commission_id=commission.id) }}" class="btn btn-icon" target="_blank" title="View"><i class="fas fa-eye"></i></a>
-                <a href="{{ url_for('dashboard_edit_commission', commission_id=commission.id) }}" class="btn btn-icon" title="Edit"><i class="fas fa-edit"></i></a>
-                <form method="POST" action="{{ url_for('dashboard_delete_commission', commission_id=commission.id) }}" class="inline-form" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this commission? This action cannot be undone.');">
-                    <button type="submit" class="btn btn-danger btn-icon" title="Delete"><i class="fas fa-trash"></i></button>
-                </form>
-            </td>
+          <td>
+            {% if commission.thumbnail %}
+              <img
+                src="{{ url_for('static', filename='uploads/commissions/' + commission.thumbnail) }}"
+                alt="{{ commission.title }}"
+                class="thumb">
+            {% else %}
+              <div class="thumb-empty">No image</div>
+            {% endif %}
+          </td>
+          <td class="fw-semibold">{{ commission.title }}</td>
+          <td>{{ commission.artist_name }}</td>
+          <td>
+            {% if commission.commission_date %}
+              {{ commission.commission_date.strftime('%Y-%m-%d') }}
+            {% else %}
+              <span class="badge-empty">N/A</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if commission.price %}
+              €{{ commission.price }}
+            {% else %}
+              <span class="badge-empty">N/A</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if commission.public %}
+              <span class="status-pill">Public</span>
+            {% else %}
+              <span class="status-pill">Private</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <div class="d-inline-flex action-gap">
+              <a href="{{ url_for('commission_detail', commission_id=commission.id) }}" class="btn btn-outline-contrast btn-sm" title="View" target="_blank" rel="noopener">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{{ url_for('dashboard_edit_commission', commission_id=commission.id) }}" class="btn btn-outline-contrast btn-sm" title="Edit">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="POST"
+                    action="{{ url_for('dashboard_delete_commission', commission_id=commission.id) }}"
+                    class="inline-form"
+                    onsubmit="return confirm('Are you sure you want to delete this commission? This action cannot be undone.');">
+                <button type="submit" class="btn btn-danger-soft btn-sm" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
         </tr>
         {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No commissions available. Please add some commissions first.</p>
-{% endif %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-4">
+    <p class="mb-3">No commissions available. Please add some commissions first.</p>
+    <a href="{{ url_for('dashboard_add_commission') }}" class="btn btn-brand btn-sm">
+      <i class="bi bi-brush me-1"></i> Add Commission
+    </a>
+  </div>
+  {% endif %}
+</div>
+
 {% endblock %}

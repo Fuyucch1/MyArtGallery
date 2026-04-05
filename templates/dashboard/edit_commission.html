@@ -1,201 +1,327 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
 {% block title %}{{ site_title }} - Edit Commission{% endblock %}
 
-{% block content %}
-<h1>Edit Commission</h1>
-<p>Update commission details and images.</p>
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+<style>
+  .helper { color: color-mix(in srgb, var(--text) 70%, transparent); }
 
-<div class="dashboard-actions">
-    <a href="{{ url_for('dashboard_commissions') }}" class="btn">Back to Commissions</a>
-    <a href="{{ url_for('commission_detail', commission_id=commission.id) }}" class="btn" target="_blank">View Commission</a>
-</div>
+  .btn-brand {
+    color:#fff;
+    background:linear-gradient(90deg,var(--brand),var(--brand-2));
+    border:1px solid color-mix(in srgb,var(--brand)45%,transparent);
+    box-shadow:0 6px 18px rgba(124,77,255,.25);
+  }
+  .btn-danger-soft{ background: color-mix(in srgb, #ef4444 12%, transparent); color: color-mix(in srgb, #ef4444 90%, #fff); border:1px solid color-mix(in srgb, #ef4444 35%, transparent); }
 
-<form method="POST" action="{{ url_for('dashboard_edit_commission', commission_id=commission.id) }}" enctype="multipart/form-data">
-    <div class="form-group">
-        <label for="title">Commission Title:</label>
-        <input type="text" id="title" name="title" class="form-control" value="{{ commission.title }}" required>
-    </div>
 
-    <div class="form-group">
-        <label for="artist_id">Artist:</label>
-        <select id="artist_id" name="artist_id" class="form-control" required>
-            <option value="">Select an Artist</option>
-            {% for artist in artists %}
-            <option value="{{ artist.id }}" {% if artist.id == commission.artist_id %}selected{% endif %}>{{ artist.name }}</option>
-            {% endfor %}
-        </select>
-    </div>
+  .section-card .form-control,
+  .section-card .form-select,
 
-    <div class="form-group">
-        <label for="description">Description:</label>
-        <textarea id="description" name="description" class="form-control" rows="5" placeholder="Description of the commission...">{{ commission.description }}</textarea>
-    </div>
+  /* Ensure all text inside cards (including Danger Zone) respects dark mode */
 
-    <div class="form-group">
-        <label for="price">Price:</label>
-        <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="{{ commission.price }}">
-    </div>
+  .section-card, .section-card p, .section-card small, .section-card label, .section-card strong,
+  .section-card .meta, .section-card .meta p { color: var(--text) !important; }
 
-    <div class="form-group">
-        <label for="commission_date">Commission Date:</label>
-        <input type="date" id="commission_date" name="commission_date" class="form-control" value="{{ commission.commission_date.strftime('%Y-%m-%d') if commission.commission_date else '' }}">
-    </div>
+  .image-grid {
+    display:flex;
+    flex-wrap:wrap;
+    gap:.75rem;
+  }
+  .image-item {
+    position:relative;
+    border-radius:.75rem;
+    overflow:hidden;
+    border:1px solid var(--border);
+    padding:.25rem;
+    background:color-mix(in srgb,var(--card) 90%,#000 10%);
+  }
+  .image-item img {
+    display:block;
+    max-width:150px;
+    max-height:150px;
+    object-fit:cover;
+    border-radius:.5rem;
+  }
+  .image-index {
+    position:absolute;
+    left:.5rem;
+    bottom:.5rem;
+    padding:.2rem .5rem;
+    font-size:.75rem;
+    border-radius:999px;
+    background:color-mix(in srgb,var(--brand) 40%,#000 30%);
+    color:#fff;
+  }
+  .image-actions {
+    position:absolute;
+    top:.5rem;
+    right:.5rem;
+  }
+  .sortable-ghost { opacity:.6; transform:scale(.97); }
 
-    <div class="form-group">
-        <label for="commission_link">Commission Link:</label>
-        <input type="url" id="commission_link" name="commission_link" class="form-control" placeholder="https://example.com/commission" value="{{ commission.commission_link }}">
-        <small>Link to the original commission page, if applicable.</small>
-    </div>
-
-    <div class="form-group">
-        <label for="custom_ref_id">Custom Reference Link:</label>
-        <select id="custom_ref_id" name="custom_ref_id" class="form-control">
-            <option value="">None</option>
-            {% for ref in custom_refs %}
-            <option value="{{ ref.id }}" {% if commission.custom_ref_id == ref.id %}selected{% endif %}>{{ ref.name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label>
-            <input type="checkbox" id="public" name="public" {% if commission.public %}checked{% endif %}>
-            Public (visible to everyone)
-        </label>
-    </div>
-
-    <div class="form-group">
-        <label>Current Images:</label>
-        <p>Drag and drop to reorder. The first image will be used as the thumbnail.</p>
-        <div class="current-images">
-            {% if images %}
-                <div class="image-grid sortable-grid">
-                    {% for image in images %}
-                    <div class="image-item" data-image-id="{{ image.id }}">
-                        <img src="{{ url_for('static', filename='uploads/commissions/' + image.filename) }}" alt="Commission Image" style="max-width: 150px; max-height: 150px;">
-                        <div class="image-index">
-                            {% if loop.index0 == 0 %}Thumbnail{% else %}Image {{ loop.index }}{% endif %}
-                        </div>
-                        <div class="image-actions">
-                            <button type="button" class="btn btn-danger" onclick="deleteImage('{{ image.id }}')">Delete</button>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                <input type="hidden" id="image-order" name="image-order" value="">
-            {% else %}
-                <p>No images available for this commission.</p>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="form-group">
-        <label for="images">Add More Images:</label>
-        <input type="file" id="images" name="images" class="form-control" accept="image/*" multiple>
-        <small>You can select multiple images to add to this commission.</small>
-    </div>
-
-    <div class="form-group">
-        <label>
-            <input type="checkbox" id="watermark" name="watermark" onchange="toggleWatermarkText()">
-            Add AI-unfriendly watermark to new images
-        </label>
-    </div>
-
-    <div class="form-group" id="watermark-text-container" style="display: none;">
-        <label for="watermark_text">Watermark Text:</label>
-        <input type="text" id="watermark_text" name="watermark_text" class="form-control" placeholder="Enter text for the watermark">
-        <small>Leave blank to use the default text: "DO NOT USE FOR AI TRAINING"</small>
-    </div>
-
-    <div class="form-group">
-        <button type="submit" class="btn">Update Commission</button>
-    </div>
-</form>
-
-<div class="danger-zone">
-    <h3>Danger Zone</h3>
-    <form method="POST" action="{{ url_for('dashboard_delete_commission', commission_id=commission.id) }}" onsubmit="return confirm('Are you sure you want to delete this commission? This action cannot be undone.');">
-        <button type="submit" class="btn btn-danger">Delete Commission</button>
-    </form>
-</div>
-<!-- Delete image forms moved outside main form to avoid nesting -->
-{% if images %}
-    <div class="delete-image-forms" style="display: none;">
-        {% for image in images %}
-        <form id="delete-image-form-{{ image.id }}" method="POST" action="{{ url_for('dashboard_delete_commission_image', image_id=image.id) }}">
-            <!-- No content needed, just the form -->
-        </form>
-        {% endfor %}
-    </div>
-{% endif %}
+  .new-preview img {
+    max-width:150px;
+    max-height:150px;
+    border-radius:.5rem;
+    border:1px solid var(--border);
+    object-fit:cover;
+  }
+</style>
 {% endblock %}
 
-{% block scripts %}
+{% block content %}
+
+<!-- HEADER -->
+<section class="hero rounded-3 p-4 mb-4 dash-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div>
+      <h1 class="mb-1">Edit Commission</h1>
+      <p class="subtitle mb-0">Update details, reorder images, and upload more.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{{ url_for('dashboard_commissions') }}" class="btn btn-outline-contrast btn-sm">
+        <i class="bi bi-brush"></i> Back to Commissions
+      </a>
+      <a href="{{ url_for('commission_detail', commission_id=commission.id) }}" class="btn btn-outline-contrast btn-sm" target="_blank">
+        <i class="bi bi-eye"></i> View Commission
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FORM CARD -->
+<div class="card section-card p-4 mb-4">
+  <form method="POST"
+        action="{{ url_for('dashboard_edit_commission', commission_id=commission.id) }}"
+        enctype="multipart/form-data"
+        class="d-flex flex-column gap-3">
+
+    <!-- Title & Artist -->
+    <div class="row g-3">
+      <div class="col-lg-8">
+        <label class="form-label fw-semibold" for="title">Commission Title</label>
+        <input type="text" id="title" name="title" class="form-control"
+               value="{{ commission.title }}" required>
+      </div>
+      <div class="col-lg-4">
+        <label class="form-label fw-semibold" for="artist_id">Artist</label>
+        <select id="artist_id" name="artist_id" class="form-select" required>
+          <option value="">Select an artist</option>
+          {% for artist in artists %}
+          <option value="{{ artist.id }}" {% if artist.id == commission.artist_id %}selected{% endif %}>{{ artist.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div>
+      <label class="form-label fw-semibold" for="description">Description</label>
+      <textarea id="description" name="description" rows="4" class="form-control">{{ commission.description }}</textarea>
+    </div>
+
+    <!-- Price / Date / Custom ref -->
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="price">Price (€)</label>
+        <input type="number" id="price" name="price" class="form-control"
+               step="0.01" min="0" value="{{ commission.price }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="commission_date">Commission Date</label>
+        <input type="date" id="commission_date" name="commission_date"
+               value="{{ commission.commission_date.strftime('%Y-%m-%d') if commission.commission_date else '' }}"
+               class="form-control">
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="custom_ref_id">Custom Reference Link</label>
+        <select id="custom_ref_id" name="custom_ref_id" class="form-select">
+          <option value="">None</option>
+          {% for ref in custom_refs %}
+          <option value="{{ ref.id }}" {% if commission.custom_ref_id == ref.id %}selected{% endif %}>{{ ref.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Commission link -->
+    <div>
+      <label class="form-label fw-semibold" for="commission_link">Original Commission Link</label>
+      <input type="url" id="commission_link" name="commission_link" class="form-control"
+             value="{{ commission.commission_link }}" placeholder="https://example.com/page">
+    </div>
+
+    <!-- Visibility -->
+    <div class="form-check">
+      <input type="checkbox" id="public" name="public" class="form-check-input"
+             {% if commission.public %}checked{% endif %}>
+      <label class="form-check-label" for="public">Public (visible to everyone)</label>
+    </div>
+
+    <div class="form-check">
+      <input type="checkbox" id="nsfw_blur" name="nsfw_blur" class="form-check-input"
+             {% if commission.nsfw_blur %}checked{% endif %}>
+      <label class="form-check-label" for="nsfw_blur">NSFW: blur preview on home/commissions page</label>
+    </div>
+
+    <!-- EXISTING IMAGES -->
+    <div>
+      <label class="form-label fw-semibold">Current Images</label>
+      {% if images %}
+        <p class="helper mb-2">Drag to reorder. The first image will be used as the thumbnail.</p>
+
+        <div class="image-grid sortable-grid">
+          {% for img in images %}
+          <div class="image-item" data-image-id="{{ img.id }}">
+            <img src="{{ url_for('static', filename='uploads/commissions/' + img.filename) }}" alt="">
+            <div class="image-index">
+              {% if loop.index0 == 0 %}Thumbnail{% else %}Image {{ loop.index }}{% endif %}
+            </div>
+            <div class="image-actions">
+              <button type="button" class="btn btn-danger-soft btn-sm"
+                      onclick="deleteImage('{{ img.id }}')">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <input type="hidden" id="image-order" name="image-order" value="">
+      {% else %}
+        <p class="helper">No images available for this commission.</p>
+      {% endif %}
+    </div>
+
+    <!-- ADD NEW IMAGES -->
+    <div>
+      <label class="form-label fw-semibold" for="images">Add More Images</label>
+      <input type="file" id="images" name="images" class="form-control" accept="image/*" multiple>
+      <small class="helper">You can select multiple images to add to this commission.</small>
+      <div id="new-image-preview" class="new-preview mt-2 d-flex gap-2 flex-wrap"></div>
+    </div>
+
+    <!-- Watermark -->
+    <div class="form-check mt-2">
+      <input type="checkbox" id="watermark" name="watermark"
+             class="form-check-input" onchange="toggleWatermarkText()">
+      <label class="form-check-label" for="watermark">Add AI-unfriendly watermark to new images</label>
+    </div>
+
+    <div id="watermark-text-container" style="display:none;">
+      <label class="form-label fw-semibold mt-2" for="watermark_text">Watermark Text</label>
+      <input type="text" id="watermark_text" name="watermark_text"
+             class="form-control" placeholder="Enter text for the watermark">
+      <small class="helper">Leave blank to use the default text: "DO NOT USE FOR AI TRAINING".</small>
+    </div>
+
+    <!-- SUBMIT -->
+    <div class="d-flex justify-content-end gap-2 pt-2">
+      <a href="{{ url_for('dashboard_commissions') }}" class="btn btn-outline-contrast">Cancel</a>
+      <button class="btn btn-brand px-4" type="submit">Update Commission</button>
+    </div>
+
+  </form>
+</div>
+
+<!-- DANGER ZONE -->
+<div class="card section-card p-4 border-danger-subtle">
+    <h3 class="h5 text-danger mb-2">Danger Zone</h3>
+  <p class="mb-3">Deleting a commission is permanent.</p>
+  <form method="POST" action="{{ url_for('dashboard_delete_commission', commission_id=commission.id) }}"
+        onsubmit="return confirm('Are you sure you want to delete this commission? This action cannot be undone.');">
+    <button type="submit" class="btn btn-danger-soft">
+      <i class="bi bi-trash me-1"></i> Delete Commission
+    </button>
+  </form>
+</div>
+
+<!-- Hidden delete-image forms -->
+{% if images %}
+<div style="display:none;">
+  {% for image in images %}
+  <form id="delete-img-{{ image.id }}" method="POST"
+        action="{{ url_for('dashboard_delete_commission_image', image_id=image.id) }}">
+  </form>
+  {% endfor %}
+</div>
+{% endif %}
+
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
 <script>
-    function toggleWatermarkText() {
-        const checkbox = document.getElementById('watermark');
-        const container = document.getElementById('watermark-text-container');
+  function toggleWatermarkText(){
+    document.getElementById('watermark-text-container').style.display =
+      document.getElementById('watermark').checked ? 'block' : 'none';
+  }
 
-        if (checkbox.checked) {
-            container.style.display = 'block';
-        } else {
-            container.style.display = 'none';
-        }
+  // Delete single image
+  function deleteImage(id){
+    if(confirm("Are you sure you want to delete this image?")){
+      document.getElementById('delete-img-'+id).submit();
     }
+  }
 
-    // Function to delete an image
-    function deleteImage(imageId) {
-        if (confirm('Are you sure you want to delete this image?')) {
-            document.getElementById('delete-image-form-' + imageId).submit();
-        }
-    }
+  // --- Sortable for existing images ---
+  function initSortable(){
+    const el = document.querySelector('.image-grid');
+    if(!el) return;
 
-    // Initialize sortable for existing images
-    function initSortable() {
-        const el = document.querySelector('.image-grid');
-        if (el) {
-            Sortable.create(el, {
-                animation: 150,
-                ghostClass: 'sortable-ghost',
-                onEnd: function() {
-                    updateImageOrder();
-                    updateImageLabels();
-                }
-            });
-        }
-    }
-
-    // Update the hidden input with the current image order
-    function updateImageOrder() {
-        const items = document.querySelectorAll('.image-grid .image-item');
-        const order = Array.from(items).map(item => item.dataset.imageId);
-        document.getElementById('image-order').value = order.join(',');
-    }
-
-    // Update the labels to show which image is the thumbnail
-    function updateImageLabels() {
-        const items = document.querySelectorAll('.image-grid .image-item');
-        items.forEach((item, index) => {
-            const label = item.querySelector('.image-index');
-            if (label) {
-                label.textContent = index === 0 ? 'Thumbnail' : `Image ${index + 1}`;
-            }
-        });
-    }
-
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        toggleWatermarkText();
-        initSortable();
-
-        // Add event listener for form submission
-        document.querySelector('form').addEventListener('submit', function() {
-            // Make sure the image order is updated before submission
-            updateImageOrder();
-        });
+    Sortable.create(el, {
+      animation:150,
+      ghostClass:'sortable-ghost',
+      onEnd: () => { updateImageOrder(); updateLabels(); }
     });
+  }
+
+  function updateImageOrder(){
+    const items = document.querySelectorAll('.image-grid .image-item');
+    const order = Array.from(items).map(i => i.dataset.imageId);
+    const hidden = document.getElementById('image-order');
+    if(hidden){
+      hidden.value = order.join(',');
+    }
+  }
+
+  function updateLabels(){
+    const items = document.querySelectorAll('.image-grid .image-item');
+    items.forEach((item, index)=>{
+      const lbl = item.querySelector('.image-index');
+      if(lbl){
+        lbl.textContent = index === 0 ? "Thumbnail" : "Image " + (index+1);
+      }
+    });
+  }
+
+  // Preview newly added images
+  const imagesInput = document.getElementById('images');
+  if(imagesInput){
+    imagesInput.addEventListener('change', e=>{
+      const wrap = document.getElementById('new-image-preview');
+      wrap.innerHTML = "";
+      Array.from(e.target.files).forEach(f=>{
+        const r = new FileReader();
+        r.onload = out=>{
+          const img = document.createElement('img');
+          img.src = out.target.result;
+          wrap.appendChild(img);
+        };
+        r.readAsDataURL(f);
+      });
+    });
+  }
+
+  // Init
+  document.addEventListener('DOMContentLoaded', ()=>{
+    initSortable();
+    toggleWatermarkText();
+
+    const form = document.querySelector('.section-card form');
+    if(form){
+      form.addEventListener('submit', updateImageOrder);
+    }
+  });
 </script>
 {% endblock %}

@@ -1,8 +1,87 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
-{% block title %}{{ site_title }} - Home{% endblock %}
 
 {% block content %}
-<h1>Welcome to {{ site_title }}</h1>
-<p>This is a gallery for managing art commissions. Use the navigation above to explore the site.</p>
+
+<style>
+    .rc-item {
+    position: relative;
+    }
+
+    .rc-img {
+        transition: opacity .25s ease;
+    }
+
+    .rc-item:hover .rc-img {
+        opacity: .75;
+    }
+
+    .rc-overlay {
+        transition: opacity .25s ease;
+        opacity: .9;
+    }
+
+    .rc-item:hover .rc-overlay {
+        opacity: 1;
+    }
+
+</style>
+
+  <section class="hero py-5 rounded-4 px-4 px-md-5 mb-4">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-9">
+        <h1 class="display-5 fw-bold">{{ site_title or 'Art Commission Gallery' }}</h1>
+        <p class="lead text-secondary">Welcome! This is a curated gallery of my commissioned artworks, plus references I share with artists.</p>
+        <div class="d-flex gap-3 mt-3">
+          <a class="btn btn-primary" style="background: linear-gradient(90deg, var(--brand), var(--brand-2)); border: 0;" href="{{ url_for('commissions') }}">View all commissions</a>
+          <a class="btn btn-outline-contrast" href="{{ url_for('references') }}">View references</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="py-3">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h2 class="h4 m-0">Recent Commissions</h2>
+      <a href="{{ url_for('commissions') }}" class="text-decoration-none">See all →</a>
+    </div>
+
+    {% if featured_commissions and featured_commissions|length > 0 %}
+      <div class="rc-scroller" aria-label="Recent commissions carousel">
+        <div class="rc-track">
+          {% for c in featured_commissions %}
+            <a class="rc-item text-decoration-none"
+               href="{{ url_for('commission_detail', commission_id=c.id) }}"
+               data-nsfw="{{ 1 if c.nsfw_blur else 0 }}">
+              {% if c.nsfw_blur %}<span class="nsfw-badge">18+</span>{% endif %}
+              {% if c.thumbnail %}
+                <img class="rc-img{% if c.nsfw_blur %} nsfw-blur{% endif %}" loading="lazy" alt="{{ c.title }}" src="{{ url_for('static', filename='uploads/commissions/' ~ c.thumbnail) }}">
+              {% else %}
+                <div class="rc-img d-flex align-items-center justify-content-center" style="background: #333; color:#bbb;">No image</div>
+              {% endif %}
+              <div class="rc-overlay">
+                <div class="rc-title">{{ c.title }}</div>
+                <div class="rc-meta">{{ c.artist_name }}{% if c.commission_date %} • {{ c.commission_date.strftime('%b %d, %Y') }}{% endif %}</div>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% else %}
+      <div class="text-secondary">No commissions yet. Add some from the dashboard when ready.</div>
+    {% endif %}
+  </section>
+
+<script>
+  // Age-gate NSFW commissions on homepage
+  document.addEventListener('click', function(e){
+    const link = e.target.closest('a.rc-item[data-nsfw="1"]');
+    if(!link) return;
+    e.preventDefault();
+    if(window.fwAgeGate && typeof window.fwAgeGate.confirm === 'function'){
+      const href = link.getAttribute('href');
+      window.fwAgeGate.confirm(function(){ window.location.href = href; });
+    }
+  });
+</script>
 {% endblock %}

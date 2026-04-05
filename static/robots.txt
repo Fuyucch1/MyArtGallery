@@ -1,0 +1,7 @@
+# robots.txt
+# This site does not grant permission for automated crawling.
+# Human visitors are welcome.
+
+User-agent: *
+Disallow: /
+

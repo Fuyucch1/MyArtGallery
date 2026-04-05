@@ -1,0 +1,26 @@
+/* ===== rf-nav-unified.patched.css ===== */
+#reference-modal .rf-nav{ display:none !important; }
+
+.rf-outer-nav{
+  position:fixed; top:50%; transform:translateY(-50%);
+  z-index:100000; padding:.5rem .8rem;
+  opacity:0; pointer-events:none; transition:opacity .15s ease;
+}
+.rf-outer-nav.show{ opacity:1; pointer-events:auto; }
+.rf-outer-prev{ left:12px; } .rf-outer-next{ right:12px; }
+
+@media (max-width:1199.98px){
+  .rf-outer-nav{
+    top:auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    transform:none; opacity:0.95;
+    padding:.45rem .7rem; font-size:16px;
+  }
+  .rf-outer-prev{ left:10px; } .rf-outer-next{ right:10px; }
+
+  .rf-hit{
+    position:fixed; top:0; bottom:0; width:33.3333vw;
+    z-index:100000; pointer-events:none;
+  }
+  .rf-hit.show{ pointer-events:auto; }
+  .rf-hit-left{ left:0; } .rf-hit-right{ right:0; }
+}

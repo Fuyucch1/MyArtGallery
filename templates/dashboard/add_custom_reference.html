@@ -1,132 +1,189 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
-{% block title %}{{ site_title }} - Add Custom Reference{% endblock %}
+{% block title %}{{ site_title }} - Create Reference Subset{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+<style>
+  .helper{ color: color-mix(in srgb, var(--text) 70%, transparent); }
+  .btn-brand{ color:#fff; background:linear-gradient(90deg,var(--brand),var(--brand-2)); border:1px solid color-mix(in srgb, var(--brand) 45%, transparent); box-shadow:0 6px 18px rgba(124,77,255,.25) }
+
+  /* Section titles + chevrons */
+  .ref-title-lg{ font-weight:700; font-size:1.1rem; }
+  .ref-title-md{ font-weight:600; font-size:1rem; }
+  .ref-divider{ height:1px; background: var(--border); }
+  .ref-chevron svg{ opacity:.8 }
+  .ref-section-header{ cursor:pointer; padding:.25rem 0; }
+  .ref-col{flex:0 0 20%;max-width:20%}
+
+  /* Cards for each thumb */
+  .ref-card{ background: var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden; position:relative; box-shadow:none; }
+  .ref-card .card-body{ padding:.6rem .8rem; }
+  .ref-card .ref-title{ font-weight:600; }
+  .ref-card .ref-desc{ opacity:.85; font-size:.9rem; }
+  .img-zoom{ display:block; width:100%; height:auto; object-fit:cover; aspect-ratio: 1 / 1; }
+  .ref-card:hover .img-zoom{ transform:none; }
+
+  .corner{ position:absolute; }
+  .top-0{ top:0; } .start-0{ left:0; } .end-0{ right:0; }
+  .download-icon{ border:1px solid var(--border); background: var(--card); color: var(--text); border-radius:8px; padding:.2rem .4rem; }
+
+  /* Ensure text inside cards respects theme */
+  .section-card, .section-card *{ color: var(--text); }
+
+  .selected-count-pill{ border:1px solid var(--border); background: color-mix(in srgb, var(--brand) 12%, transparent); border-radius:999px; padding:.15rem .6rem; }
+</style>
+{% endblock %}
 
 {% block content %}
-<h1>Create New Custom Reference</h1>
-<p>Create a custom reference link containing selected reference images.</p>
+<section class="hero rounded-3 p-4 mb-3 dash-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div>
+      <h1 class="mb-1">Create Reference Subset</h1>
+      <p class="subtitle mb-0">Pick images across categories and subcategories to assemble a shareable subset.</p>
+    </div>
+    <a href="{{ url_for('dashboard_custom_references') }}" class="btn btn-outline-contrast btn-sm"><i class="bi bi-collection me-1"></i> Back to Subsets</a>
+  </div>
+</section>
 
-<div class="dashboard-actions">
-    <a href="{{ url_for('dashboard_custom_references') }}" class="btn">Back to Custom References</a>
+<!-- Form header -->
+<div class="card section-card p-4 mb-3">
+  <form id="custom-ref-form" method="POST" action="{{ url_for('dashboard_add_custom_reference') }}" class="d-flex flex-column gap-3">
+    <div>
+      <label for="name" class="form-label fw-semibold">Subset Name</label>
+      <input type="text" id="name" name="name" class="form-control" required>
+      <small class="helper">This name identifies the subset link.</small>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <span class="helper">Selected:</span>
+      <span class="selected-count-pill"><span id="selected-count">0</span></span>
+      <div class="ms-auto d-flex gap-2">
+        <button type="submit" class="btn btn-brand btn-sm"><i class="bi bi-check2 me-1"></i> Create Subset</button>
+      </div>
+    </div>
+  </form>
 </div>
 
-<form method="POST" action="{{ url_for('dashboard_add_custom_reference') }}">
-    <div class="form-group">
-        <label for="name">Custom Reference Name:</label>
-        <input type="text" id="name" name="name" class="form-control" required>
-        <small>This name will be used to identify the custom reference link.</small>
-    </div>
-    
-    <div class="form-group">
-        <label>Select References to Include:</label>
-        <div class="selected-count">Selected: <span id="selected-count">0</span></div>
-        
-        <div class="filter-controls">
-            <div class="form-group">
-                <label for="category-filter">Filter by Category:</label>
-                <select id="category-filter" class="form-control">
-                    <option value="">All Categories</option>
-                    {% for ref in references %}
-                        {% if loop.first or references[loop.index0 - 1].category != ref.category %}
-                            <option value="{{ ref.category }}">{{ ref.category }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="folder-filter">Filter by Folder:</label>
-                <select id="folder-filter" class="form-control">
-                    <option value="">All Folders</option>
-                    {% for ref in references %}
-                        {% if loop.first or references[loop.index0 - 1].folder != ref.folder %}
-                            <option value="{{ ref.folder }}">{{ ref.folder }}</option>
-                        {% endif %}
-                    {% endfor %}
-                </select>
-            </div>
+<!-- Reference picker (grouped by Category > Subcategory) -->
+<div class="card section-card p-4">
+  {% if references %}
+    {# Build a normalized mapping no matter what shape `references` is #}
+    {% set organized = {} %}
+    {% if references.items is defined %}
+      {# Already mapping: copy into organized #}
+      {% for category, subcats in references.items() %}
+        {% set _ = organized.setdefault(category, {}) %}
+        {% for sub, items in subcats.items() %}
+          {% set _ = organized[category].setdefault(sub, []) %}
+          {% for ref in items %}
+            {% set _ = organized[category][sub].append(ref) %}
+          {% endfor %}
+        {% endfor %}
+      {% endfor %}
+    {% else %}
+      {# List of refs: group by category/subcategory #}
+      {% for ref in references %}
+        {% set cat = ref.category or '' %}
+        {% set sub = ref.subcategory or '' %}
+        {% set _ = organized.setdefault(cat, {}) %}
+        {% set _ = organized[cat].setdefault(sub, []) %}
+        {% set _ = organized[cat][sub].append(ref) %}
+      {% endfor %}
+    {% endif %}
+
+    {# Render grouped like the inspiration layout #}
+    {% for category, subcats in organized.items() %}
+      {% set has_cat = category|trim %}
+      <div class="mb-4 ref-section reference-category" data-category="{{ category }}">
+        {% if has_cat %}
+        <div class="d-flex align-items-center justify-content-between ref-section-header" data-toggle="category">
+          <div class="d-flex align-items-center gap-2">
+            <span class="ref-title-lg">{{ category }}</span>
+            <span class="ref-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+          </div>
         </div>
-    </div>
-    
-    <div class="reference-selection">
-        {% if references %}
-            <div class="reference-grid">
-                {% for ref in references %}
-                <div class="reference-item" data-category="{{ ref.category }}" data-folder="{{ ref.folder }}">
-                    <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" style="max-width: 150px; max-height: 150px;">
-                    <div class="reference-info">
-                        <p>{{ ref.category }} / {{ ref.folder }}</p>
-                        <label>
-                            <input type="checkbox" name="references" value="{{ ref.id }}" class="reference-checkbox">
-                            Include
-                        </label>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <p>No references available. Please add some references first.</p>
+        <div class="ref-divider mb-2"></div>
         {% endif %}
-    </div>
-    
-    <div class="form-group">
-        <button type="submit" class="btn">Create Custom Reference</button>
-    </div>
-</form>
+
+        <div class="ref-section-body">
+          {% for subcategory, items in subcats.items() %}
+            {% set has_sub = subcategory|trim %}
+            <div class="mb-3 ref-section reference-subcategory" data-subcategory="{{ subcategory }}">
+              {% if has_sub %}
+              <div class="d-flex align-items-center justify-content-between ref-section-header" data-toggle="subcategory">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="ref-title-md">{{ subcategory }}</span>
+                  <span class="ref-chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+                </div>
+              </div>
+              {% endif %}
+
+              <div class="ref-section-body">
+                <div class="row g-3">
+                  {% for ref in items %}
+                    {% set parts = ref.filename.rsplit('.', 1) %}
+                    {% set mini = parts[0] ~ '_miniature.webp' %}
+                    <div class="col-6 col-md-4 col-lg-3 ref-col">
+                      <div class="card ref-card h-100 reference-item" data-id="{{ ref.id or loop.index0 }}" data-category="{{ category }}" data-subcategory="{{ subcategory }}">
+                        <a class="img-link" href="#" onclick="openReferenceModalFrom(this); return false;" aria-label="Open in modal">
+                          <img class="card-img-top img-zoom" alt="{{ ref.name or ref.filename }}" src="{{ url_for('static', filename='uploads/references/' ~ mini) }}" data-original="{{ url_for('static', filename='uploads/references/' ~ ref.filename) }}">
+                        </a>
+
+                        <!-- Checkbox -->
+                        <div class="corner top-0 start-0 m-2">
+                          <input type="checkbox" class="form-check-input ref-select" name="references" form="custom-ref-form" value="{{ ref.id or loop.index0 }}" aria-label="Select image">
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="corner top-0 end-0 m-2 d-flex align-items-center gap-2">
+                          {% if session.get('authenticated') %}
+                          <a class="btn btn-sm download-icon" title="Edit" href="{{ url_for('dashboard_edit_reference', ref_id=ref.id) }}">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                          </a>
+                          {% endif %}
+                          <a class="btn btn-sm download-icon" title="Download" href="{{ url_for('static', filename='uploads/references/' ~ ref.filename) }}" download>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          </a>
+                        </div>
+
+                        <div class="card-body">
+                          {% if ref.name %}<div class="ref-title text-truncate">{{ ref.name }}</div>{% endif %}
+                          {% if ref.description %}<div class="ref-desc text-truncate">{{ ref.description }}</div>{% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="ref-desc">No references available.</div>
+  {% endif %}
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const categoryFilter = document.getElementById('category-filter');
-        const folderFilter = document.getElementById('folder-filter');
-        const referenceItems = document.querySelectorAll('.reference-item');
-        const checkboxes = document.querySelectorAll('.reference-checkbox');
-        const selectedCount = document.getElementById('selected-count');
-        
-        // Update selected count
-        function updateSelectedCount() {
-            const count = document.querySelectorAll('.reference-checkbox:checked').length;
-            selectedCount.textContent = count;
-        }
-        
-        // Apply filters
-        function applyFilters() {
-            const categoryValue = categoryFilter.value;
-            const folderValue = folderFilter.value;
-            
-            referenceItems.forEach(item => {
-                const categoryMatch = !categoryValue || item.getAttribute('data-category') === categoryValue;
-                const folderMatch = !folderValue || item.getAttribute('data-folder') === folderValue;
-                
-                if (categoryMatch && folderMatch) {
-                    item.style.display = '';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-        }
-        
-        // Add event listeners
-        categoryFilter.addEventListener('change', applyFilters);
-        folderFilter.addEventListener('change', applyFilters);
-        
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', updateSelectedCount);
-        });
-        
-        // Form validation
-        const form = document.querySelector('form');
-        form.addEventListener('submit', function(e) {
-            const checkedCount = document.querySelectorAll('.reference-checkbox:checked').length;
-            if (checkedCount === 0) {
-                e.preventDefault();
-                alert('Please select at least one reference image.');
-            }
-        });
-        
-        // Initialize
-        updateSelectedCount();
+  document.addEventListener('DOMContentLoaded', function(){
+    const countEl = document.getElementById('selected-count');
+    const checkboxes = document.querySelectorAll('.ref-select');
+
+    function updateCount(){ countEl.textContent = document.querySelectorAll('.ref-select:checked').length; }
+    checkboxes.forEach(cb => cb.addEventListener('change', updateCount));
+    updateCount();
+
+    // Collapse/expand handlers for categories & subcategories
+    document.querySelectorAll('.ref-section-header').forEach(h => {
+      h.addEventListener('click', function(){
+        const body = this.parentElement.querySelector('.ref-section-body');
+        if(!body) return; body.style.display = (body.style.display === 'none') ? '' : 'none';
+      });
     });
+  });
 </script>
 {% endblock %}

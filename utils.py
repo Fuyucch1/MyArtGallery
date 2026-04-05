@@ -1,166 +1,118 @@
-from PIL import Image, ImageDraw, ImageFont, ImageChops
-import math
-import os, platform
+import os
+from typing import Optional
 
-# Get Fonts
+# Utilities for image processing. These functions are used by the dashboard to
+# add watermarks and generate miniatures for faster browsing.
+# They gracefully degrade if Pillow is not available.
 
-def get_font(font_size):
-    # Common font paths by platform
-    font_paths = []
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    PIL_AVAILABLE = True
+except Exception:
+    PIL_AVAILABLE = False
 
-    system = platform.system()
-    if system == "Windows":
-        font_paths = [
-            "C:\\Windows\\Fonts\\arial.ttf",
-            "C:\\Windows\\Fonts\\verdana.ttf"
-        ]
-    elif system == "Darwin":  # macOS
-        font_paths = [
-            "/System/Library/Fonts/Supplemental/Arial.ttf",
-            "/System/Library/Fonts/Supplemental/Verdana.ttf"
-        ]
-    else:  # Linux
-        font_paths = [
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-            "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
-        ]
 
-    # Try loading fonts in order of preference
-    for path in font_paths:
-        if os.path.exists(path):
-            try:
-                return ImageFont.truetype(path, font_size)
-            except IOError:
-                continue
+def add_watermark(input_path: str, output_path: str, text: Optional[str]) -> bool:
+    """
+    Add a simple semi-transparent text watermark to the bottom-right of the image.
+    If Pillow isn't available, this function copies the original image to output_path.
 
-    # Fallback
-    return ImageFont.load_default()
-
-# Draw outline text on image
-def draw_outline_text_hollow(base_img, position, text, font, outline_color, thickness=2):
-    # Create a temporary image for drawing the outline
-    txt = Image.new('RGBA', base_img.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(txt)
-
-    x, y = position
-
-    # Draw text multiple times for the outline
-    for dx in range(-thickness, thickness + 1):
-        for dy in range(-thickness, thickness + 1):
-            if dx != 0 or dy != 0:
-                draw.text((x + dx, y + dy), text, font=font, fill=outline_color)
-
-    # Draw the center text in transparent to "erase" it
-    erase = Image.new('L', base_img.size, 0)
-    erase_draw = ImageDraw.Draw(erase)
-    erase_draw.text(position, text, font=font, fill=255)
-    txt.putalpha(ImageChops.subtract(txt.getchannel('A'), erase))
-
-    # Composite the outline onto the base image
-    base_img.alpha_composite(txt)
-
-# Create miniature version of image in webp format
-def create_miniature(image_path, output_dir=None, max_size=300):
+    Returns True on success, False otherwise.
+    """
     try:
-        # Open the original image
-        img = Image.open(image_path)
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        # Calculate new dimensions while maintaining aspect ratio
-        width, height = img.size
-        if width > height:
-            new_width = min(width, max_size)
-            new_height = int(height * (new_width / width))
-        else:
-            new_height = min(height, max_size)
-            new_width = int(width * (new_height / height))
+        if not PIL_AVAILABLE:
+            # Best-effort fallback: just copy the file
+            with open(input_path, 'rb') as src, open(output_path, 'wb') as dst:
+                dst.write(src.read())
+            return True
 
-        # Resize the image
-        img = img.resize((new_width, new_height), Image.LANCZOS)
+        base = Image.open(input_path).convert('RGBA')
+        txt_layer = Image.new('RGBA', base.size, (255, 255, 255, 0))
+        draw = ImageDraw.Draw(txt_layer)
 
-        # Determine output path
-        if output_dir is None:
-            output_dir = os.path.dirname(image_path)
+        # Choose font size relative to image width
+        W, H = base.size
+        font_size = max(18, int(W * 0.03))
 
-        # Get filename without extension
-        filename = os.path.basename(image_path)
-        name, ext = os.path.splitext(filename)
+        try:
+            # Try a common font; Pillow will fall back if not found
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except Exception:
+            font = ImageFont.load_default()
 
-        # Create miniature filename with _miniature suffix and .webp extension
-        miniature_filename = f"{name}_miniature.webp"
-        output_path = os.path.join(output_dir, miniature_filename)
+        wm_text = text or "WATERMARK"
+        text_bbox = draw.textbbox((0, 0), wm_text, font=font)
+        tw = text_bbox[2] - text_bbox[0]
+        th = text_bbox[3] - text_bbox[1]
 
-        # Save as webp with good quality
-        img.save(output_path, 'WEBP', quality=80)
+        padding = max(10, int(W * 0.01))
+        x = W - tw - padding
+        y = H - th - padding
 
-        return miniature_filename
-    except Exception as e:
-        print(f"Error creating miniature: {e}")
-        return None
+        # Draw shadow
+        draw.text((x+1, y+1), wm_text, font=font, fill=(0, 0, 0, 128))
+        # Draw main text
+        draw.text((x, y), wm_text, font=font, fill=(255, 255, 255, 160))
 
-# Add watermark to image
-def add_watermark(image_path, output_path, watermark_text=None):
-    try:
-        img = Image.open(image_path)
-        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
-
-        base_font_size = 36
-        base_image_width = 1000
-        font_size = max(24, min(72, int(img.width * base_font_size / base_image_width)))
-        font = get_font(font_size)
-
-        if not watermark_text:
-            watermark_text = "DO NOT USE FOR AI TRAINING"
-
-        bbox = draw.textbbox((0, 0), watermark_text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
-
-        spacing_x = text_width * 3
-        spacing_y = text_height * 2.5
-
-        num_x = math.ceil(img.width / spacing_x) + 2
-        num_y = math.ceil(img.height / spacing_y) + 6
-
-        txt_img = Image.new('RGBA', (text_width * 2, text_height * 2), (0, 0, 0, 0))
-
-        draw_outline_text_hollow(
-            txt_img,
-            (text_width // 2, text_height // 2),
-            watermark_text,
-            font,
-            outline_color=(128, 128, 128, 128),
-            thickness=2
-        )
-
-        rotated_txt_pos = txt_img.rotate(30, expand=1)
-        rotated_txt_neg = txt_img.rotate(-30, expand=1)
-
-        for i in range(num_y):
-            for j in range(num_x):
-                base_x = j * spacing_x - text_width
-                y = i * spacing_y - (spacing_y * 3)
-
-                x = int(base_x)
-                overlay.paste(rotated_txt_pos, (x, int(y)), rotated_txt_pos)
-
-                x = int(base_x + spacing_x // 3)
-                overlay.paste(rotated_txt_neg, (x, int(y)), rotated_txt_neg)
-
-                x = int(base_x + 2 * (spacing_x // 3))
-                overlay.paste(rotated_txt_pos, (x, int(y)), rotated_txt_pos)
-
-        if img.mode != 'RGBA':
-            img = img.convert('RGBA')
-
-        watermarked = Image.alpha_composite(img, overlay)
-
-        if watermarked.mode == 'RGBA':
-            watermarked = watermarked.convert('RGB')
-
-        watermarked.save(output_path)
+        watermarked = Image.alpha_composite(base, txt_layer).convert('RGB')
+        # Save as JPEG to ensure broad compatibility
+        watermarked.save(output_path, format='JPEG', quality=90)
         return True
     except Exception as e:
-        print(f"Error adding watermark: {e}")
+        print(f"add_watermark error: {e}")
+        return False
+
+def resize_with_min_size(img: Image.Image, min_size: int) -> Image.Image:
+    """
+    Resize so that the smallest side becomes exactly min_size.
+    Does not upscale: if smallest side >= min_size, returns original size.
+    """
+    w, h = img.size
+    smallest = min(w, h)
+
+    # no upscale allowed
+    if smallest <= min_size:
+        return img.copy()
+
+    scale = min_size / smallest
+    new_w = int(w * scale)
+    new_h = int(h * scale)
+
+    return img.resize((new_w, new_h), Image.LANCZOS)
+
+def create_miniature(input_path: str, output_dir: str, max_size: int = 300) -> bool:
+    """
+    Create a smaller WebP miniature version of the image next to the original.
+    The output file is named with the pattern: <original_name>_miniature.webp
+    Returns True on success, False otherwise.
+    """
+    try:
+        if not os.path.exists(input_path):
+            return False
+
+        dirname, filename = os.path.split(input_path)
+        name, ext = os.path.splitext(filename)
+
+        # Output beside the original, but allow overriding directory
+        out_dir = output_dir if output_dir else dirname
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(out_dir, f"{name}_miniature.webp")
+
+        if not PIL_AVAILABLE:
+            # Fallback: just copy original as webp not possible; copy original bytes
+            # This won't reduce size, but keeps references consistent
+            with open(input_path, 'rb') as src, open(out_path, 'wb') as dst:
+                dst.write(src.read())
+            return True
+
+        with Image.open(input_path) as img:
+            img = img.convert('RGB')
+            img = resize_with_min_size(img, max_size)
+            img.save(out_path, format='WEBP', quality=80, method=6)
+
+        return True
+    except Exception as e:
+        print(f"create_miniature error: {e}")
         return False

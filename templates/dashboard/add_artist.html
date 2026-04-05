@@ -1,35 +1,56 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
 {% block title %}{{ site_title }} - Add Artist{% endblock %}
 
+{% block head_extra %}
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+/>
+<style>
+  .helper{ color: color-mix(in srgb, var(--text) 75%, transparent); }
+  /* Ensure brand buttons have a visible contour and correct text color */
+  .btn-brand{ border:1px solid color-mix(in srgb, var(--brand) 45%, transparent); color:#fff; background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
+  /* Inputs respect theme surfaces */
+  .section-card .form-control { background: var(--input, var(--card)); color: var(--text); border:1px solid var(--border); }
+  .section-card .form-control::placeholder { color: color-mix(in srgb, var(--text) 55%, transparent); }
+</style>
+{% endblock %}
+
 {% block content %}
-<h1>Add New Artist</h1>
-<p>Add a new artist to the database.</p>
+<section class="hero rounded-3 p-4 mb-4 dash-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div>
+      <h1 class="mb-1">Add New Artist</h1>
+      <p class="subtitle mb-0">Create an artist profile with links and notes.</p>
+    </div>
+    <a href="{{ url_for('dashboard_artists') }}" class="btn btn-outline-contrast btn-sm"><i class="bi bi-people me-1"></i> Back to Artists</a>
+  </div>
+</section>
 
-<div class="dashboard-actions">
-    <a href="{{ url_for('dashboard_artists') }}" class="btn">Back to Artists</a>
+<div class="card section-card p-4">
+  <form method="POST" action="{{ url_for('dashboard_add_artist') }}" class="d-flex flex-column gap-3">
+    <div>
+      <label for="name" class="form-label fw-semibold">Artist Name</label>
+      <input type="text" id="name" name="name" class="form-control" required>
+    </div>
+
+    <div>
+      <label for="social_links" class="form-label fw-semibold">Social Links</label>
+      <textarea id="social_links" name="social_links" class="form-control" rows="3" placeholder="Twitter: @artist, Instagram: @artist, etc."></textarea>
+      <small class="helper">Enter social media links or handles, one per line or comma-separated.</small>
+    </div>
+
+    <div>
+      <label for="notes" class="form-label fw-semibold">Notes</label>
+      <textarea id="notes" name="notes" class="form-control" rows="5" placeholder="Additional information about the artist..."></textarea>
+      <small class="helper">Any additional information about the artist, such as preferred payment methods, communication preferences, etc.</small>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+      <a href="{{ url_for('dashboard_artists') }}" class="btn btn-outline-contrast">Cancel</a>
+      <button type="submit" class="btn btn-brand px-4">Add Artist</button>
+    </div>
+  </form>
 </div>
-
-<form method="POST" action="{{ url_for('dashboard_add_artist') }}">
-    <div class="form-group">
-        <label for="name">Artist Name:</label>
-        <input type="text" id="name" name="name" class="form-control" required>
-    </div>
-    
-    <div class="form-group">
-        <label for="social_links">Social Links:</label>
-        <textarea id="social_links" name="social_links" class="form-control" rows="3" placeholder="Twitter: @artist, Instagram: @artist, etc."></textarea>
-        <small>Enter social media links or handles, one per line or comma-separated.</small>
-    </div>
-    
-    <div class="form-group">
-        <label for="notes">Notes:</label>
-        <textarea id="notes" name="notes" class="form-control" rows="5" placeholder="Additional information about the artist..."></textarea>
-        <small>Any additional information about the artist, such as preferred payment methods, communication preferences, etc.</small>
-    </div>
-    
-    <div class="form-group">
-        <button type="submit" class="btn">Add Artist</button>
-    </div>
-</form>
 {% endblock %}

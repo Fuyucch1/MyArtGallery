@@ -1,5 +1,6 @@
 import sqlite3
 from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Database connection helper
 def get_db_connection():
@@ -119,10 +120,17 @@ def init_db():
         custom_ref_id INTEGER,
         commission_link TEXT,
         public BOOLEAN DEFAULT 1,
+        nsfw_blur BOOLEAN DEFAULT 0,
         FOREIGN KEY (artist_id) REFERENCES [artists] (id),
         FOREIGN KEY (custom_ref_id) REFERENCES [custom_references] (id)
     )
     ''')
+
+    # Ensure nsfw_blur column exists (migration for older DBs)
+    cursor.execute("PRAGMA table_info([commissions])")
+    comm_columns = cursor.fetchall()
+    if not any(column['name'] == 'nsfw_blur' for column in comm_columns):
+        cursor.execute('ALTER TABLE [commissions] ADD COLUMN nsfw_blur BOOLEAN DEFAULT 0')
 
     # Create commission images table
     cursor.execute('''
@@ -134,6 +142,44 @@ def init_db():
         FOREIGN KEY (commission_id) REFERENCES [commissions] (id) ON DELETE CASCADE
     )
     ''')
+
+    # --- Metrics / analytics (privacy-friendly, self-hosted) ---
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS [metrics_events] (
+        id INTEGER PRIMARY KEY,
+        ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        event_type TEXT NOT NULL,
+        path TEXT NOT NULL,
+        method TEXT,
+        status_code INTEGER,
+        referrer TEXT,
+        user_agent TEXT,
+        ip TEXT,
+        visitor_id TEXT,
+        country TEXT,
+        region TEXT,
+        city TEXT
+    )
+    ''')
+
+    # Add missing columns for older DBs (safe migrations)
+    cursor.execute("PRAGMA table_info([metrics_events])")
+    mcols = cursor.fetchall()
+    mcol_names = {c['name'] for c in mcols} if mcols else set()
+    required_metric_cols = [
+        ('method', 'TEXT'),
+        ('status_code', 'INTEGER'),
+        ('referrer', 'TEXT'),
+        ('user_agent', 'TEXT'),
+        ('ip', 'TEXT'),
+        ('visitor_id', 'TEXT'),
+        ('country', 'TEXT'),
+        ('region', 'TEXT'),
+        ('city', 'TEXT'),
+    ]
+    for name, coltype in required_metric_cols:
+        if name not in mcol_names:
+            cursor.execute(f'ALTER TABLE [metrics_events] ADD COLUMN {name} {coltype}')
 
     conn.commit()
     conn.close()
@@ -519,6 +565,7 @@ def get_public_commissions():
         thumbnail = cursor.fetchone()
         commissions[i] = convert_date_fields(comm, ['commission_date'])
         commissions[i]['thumbnail'] = thumbnail['filename'] if thumbnail else None
+        commissions[i]['nsfw_blur'] = 1 if commissions[i].get('nsfw_blur') else 0
 
     conn.close()
     return commissions
@@ -546,6 +593,7 @@ def get_all_commissions():
         thumbnail = cursor.fetchone()
         commissions[i] = convert_date_fields(comm, ['commission_date'])
         commissions[i]['thumbnail'] = thumbnail['filename'] if thumbnail else None
+        commissions[i]['nsfw_blur'] = 1 if commissions[i].get('nsfw_blur') else 0
 
     conn.close()
     return commissions
@@ -588,37 +636,38 @@ def get_commission_by_id(commission_id, public_only=True):
 
     result = convert_date_fields(commission, ['commission_date'])
     result['images'] = images
+    result['nsfw_blur'] = 1 if result.get('nsfw_blur') else 0
 
     conn.close()
     return result
 
-def add_commission(title, artist_id, description, price, commission_date, commission_link, custom_ref_id, public):
+def add_commission(title, artist_id, description, price, commission_date, commission_link, custom_ref_id, public, nsfw_blur=0):
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute('''
         INSERT INTO [commissions] (title, artist_id, description, price, commission_date, 
-                                commission_link, custom_ref_id, public)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (title, artist_id, description, price, commission_date, 
-         commission_link, custom_ref_id, public))
+                                commission_link, custom_ref_id, public, nsfw_blur)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (title, artist_id, description, price, commission_date,
+         commission_link, custom_ref_id, public, nsfw_blur))
     commission_id = cursor.lastrowid
 
     conn.commit()
     conn.close()
     return commission_id
 
-def update_commission(commission_id, title, artist_id, description, price, commission_date, commission_link, custom_ref_id, public):
+def update_commission(commission_id, title, artist_id, description, price, commission_date, commission_link, custom_ref_id, public, nsfw_blur=0):
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute('''
         UPDATE [commissions] 
         SET title = ?, artist_id = ?, description = ?, price = ?, 
-            commission_date = ?, commission_link = ?, custom_ref_id = ?, public = ?
+            commission_date = ?, commission_link = ?, custom_ref_id = ?, public = ?, nsfw_blur = ?
         WHERE id = ?
     ''', (title, artist_id, description, price, commission_date, 
-         commission_link, custom_ref_id, public, commission_id))
+         commission_link, custom_ref_id, public, nsfw_blur, commission_id))
 
     conn.commit()
     conn.close()
@@ -692,6 +741,136 @@ def update_commission_image_order(image_orders):
         conn.rollback()
         conn.close()
         return False
+
+# --- Metrics / analytics helpers ---
+
+def log_metric_event(
+    event_type: str,
+    path: str,
+    method: str = None,
+    status_code: int = None,
+    referrer: str = None,
+    user_agent: str = None,
+    ip: str = None,
+    visitor_id: str = None,
+    country: str = None,
+    region: str = None,
+    city: str = None,
+    ts: datetime = None,
+) -> None:
+    """Insert a single metrics event (best-effort)."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        if ts is None:
+            cursor.execute(
+                '''INSERT INTO [metrics_events]
+                   (event_type, path, method, status_code, referrer, user_agent, ip, visitor_id, country, region, city)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (event_type, path, method, status_code, referrer, user_agent, ip, visitor_id, country, region, city)
+            )
+        else:
+            cursor.execute(
+                '''INSERT INTO [metrics_events]
+                   (ts, event_type, path, method, status_code, referrer, user_agent, ip, visitor_id, country, region, city)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                (ts.strftime('%Y-%m-%d %H:%M:%S'), event_type, path, method, status_code, referrer, user_agent, ip, visitor_id, country, region, city)
+            )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"log_metric_event error: {e}")
+
+
+def get_metrics_summary(days: int = 30) -> dict:
+    """Return aggregate metrics for the last N days."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """SELECT
+                COUNT(*) AS pageviews,
+                COUNT(DISTINCT visitor_id) AS unique_visitors
+            FROM [metrics_events]
+            WHERE event_type = 'pageview'
+              AND ts >= datetime('now', ?)""",
+        (f'-{int(days)} days',)
+    )
+    totals = cursor.fetchone() or {'pageviews': 0, 'unique_visitors': 0}
+
+    cursor.execute(
+        """SELECT path, COUNT(*) AS c
+            FROM [metrics_events]
+            WHERE event_type='pageview'
+              AND ts >= datetime('now', ?)
+            GROUP BY path
+            ORDER BY c DESC
+            LIMIT 10""",
+        (f'-{int(days)} days',)
+    )
+    top_pages = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute(
+        """SELECT COALESCE(referrer, '') AS referrer, COUNT(*) AS c
+            FROM [metrics_events]
+            WHERE event_type='pageview'
+              AND ts >= datetime('now', ?)
+            GROUP BY COALESCE(referrer, '')
+            ORDER BY c DESC
+            LIMIT 10""",
+        (f'-{int(days)} days',)
+    )
+    top_referrers = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute(
+        """SELECT COALESCE(country, '') AS country, COUNT(*) AS c
+            FROM [metrics_events]
+            WHERE event_type='pageview'
+              AND ts >= datetime('now', ?)
+            GROUP BY COALESCE(country, '')
+            ORDER BY c DESC
+            LIMIT 10""",
+        (f'-{int(days)} days',)
+    )
+    top_countries = [dict(r) for r in cursor.fetchall()]
+
+    cursor.execute(
+        """SELECT strftime('%Y-%m-%d', ts) AS day,
+                   COUNT(*) AS pageviews,
+                   COUNT(DISTINCT visitor_id) AS unique_visitors
+            FROM [metrics_events]
+            WHERE event_type='pageview'
+              AND ts >= datetime('now', ?)
+            GROUP BY strftime('%Y-%m-%d', ts)
+            ORDER BY day ASC""",
+        (f'-{int(days)} days',)
+    )
+    daily = [dict(r) for r in cursor.fetchall()]
+
+    conn.close()
+
+    return {
+        'days': int(days),
+        'totals': dict(totals),
+        'top_pages': top_pages,
+        'top_referrers': top_referrers,
+        'top_countries': top_countries,
+        'daily': daily,
+    }
+
+
+def delete_metrics_older_than(days: int = 180) -> int:
+    """Delete metrics events older than N days. Returns rows deleted."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM [metrics_events] WHERE ts < datetime('now', ?)",
+        (f'-{int(days)} days',)
+    )
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return deleted
 
 # Dashboard related functions
 def rename_category(old_category, new_category):

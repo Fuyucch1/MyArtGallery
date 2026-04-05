@@ -1,26 +1,28 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
-{% block title %}Login{% endblock %}
+{% block main_classes %}d-flex align-items-center{% endblock %}
 
 {% block content %}
-<div class="modern-page-header">
-    <h1>Admin Login</h1>
-    <p>Please log in to access the dashboard.</p>
-</div>
-
-<form method="POST" action="{{ url_for('login') }}">
-    <div class="form-group">
-        <label for="username">Username:</label>
-        <input type="text" id="username" name="username" class="form-control" required>
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card border-0">
+        <div class="card-body p-4">
+          <h1 class="h4 mb-3">Login</h1>
+          <form method="post">
+            <div class="mb-3">
+              <label class="form-label">Username</label>
+              <input type="text" class="form-control" name="username" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input type="password" class="form-control" name="password" required>
+            </div>
+            <div class="d-grid">
+              <button class="btn btn-primary" style="background: linear-gradient(90deg, var(--brand), var(--brand-2)); border: 0;">Login</button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
-    
-    <div class="form-group">
-        <label for="password">Password:</label>
-        <input type="password" id="password" name="password" class="form-control" required>
-    </div>
-    
-    <div class="form-group">
-        <button type="submit" class="btn">Login</button>
-    </div>
-</form>
+  </div>
 {% endblock %}

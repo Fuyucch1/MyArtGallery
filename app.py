@@ -8,6 +8,7 @@ import db
 from datetime import datetime
 import uuid
 from utils import add_watermark
+
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)
 
@@ -47,7 +48,7 @@ def index():
     site_title = db.get_site_title()
     # Fetch a few recent public commissions to feature on the homepage
     try:
-        featured_commissions = db.get_public_commissions()[:10]
+        featured_commissions = db.get_public_commissions()[:6]
     except Exception:
         featured_commissions = []
     return render_template('index.html', site_title=site_title, featured_commissions=featured_commissions)
@@ -95,6 +96,11 @@ def logout():
     session.pop('authenticated', None)
     flash('You have been logged out')
     return redirect(url_for('index'))
+
+@app.route('/about')
+def about():
+    site_title = db.get_site_title()
+    return render_template('about.html', site_title=site_title)
 
 @app.route('/references')
 def references():
@@ -575,6 +581,7 @@ def dashboard_add_commission():
         commission_link = request.form.get('commission_link')
         custom_ref_id = request.form.get('custom_ref_id') or None
         public = 1 if request.form.get('public') else 0
+        nsfw_blur = 1 if request.form.get('nsfw_blur') else 0
 
         if not title or not artist_id:
             flash('Title and artist are required')
@@ -582,7 +589,7 @@ def dashboard_add_commission():
 
         # Add commission
         commission_id = db.add_commission(title, artist_id, description, price, commission_date, 
-                                         commission_link, custom_ref_id, public)
+                                         commission_link, custom_ref_id, public, nsfw_blur)
 
         # Handle image uploads
         if 'images' in request.files:
@@ -689,6 +696,7 @@ def dashboard_edit_commission(commission_id):
         commission_link = request.form.get('commission_link')
         custom_ref_id = request.form.get('custom_ref_id') or None
         public = 1 if request.form.get('public') else 0
+        nsfw_blur = 1 if request.form.get('nsfw_blur') else 0
 
         if not title or not artist_id:
             flash('Title and artist are required')
@@ -696,7 +704,7 @@ def dashboard_edit_commission(commission_id):
 
         # Update commission
         db.update_commission(commission_id, title, artist_id, description, price, commission_date, 
-                           commission_link, custom_ref_id, public)
+                           commission_link, custom_ref_id, public, nsfw_blur)
 
         # Process image order if provided
         image_order = request.form.get('image-order', '')
@@ -979,6 +987,161 @@ def download_references_zip():
                 'Content-Disposition': f'attachment; filename="{zip_filename}"'
             }
         )
+
+# --- robots / llms policy files ---
+@app.route('/robots.txt')
+def robots_txt():
+    return send_from_directory('static', 'robots.txt', mimetype='text/plain')
+
+
+@app.route('/llms.txt')
+def llms_txt():
+    return send_from_directory('static', 'llms.txt', mimetype='text/plain')
+
+
+def _get_client_ip() -> str:
+    # Respect common reverse-proxy headers if present.
+    xff = request.headers.get('X-Forwarded-For', '')
+    if xff:
+        # format: client, proxy1, proxy2
+        return xff.split(',')[0].strip()
+    xrip = request.headers.get('X-Real-IP', '')
+    if xrip:
+        return xrip.strip()
+    return request.remote_addr or ''
+
+
+def _best_effort_geo_from_ip(ip: str):
+    """Return (country, region, city) using a local lookup if available.
+
+    This intentionally avoids any external network calls.
+    If geo can't be resolved, returns (None, None, None).
+    """
+    if not ip:
+        return None, None, None
+
+    # Avoid treating private ranges as geo-resolvable.
+    if ip.startswith('10.') or ip.startswith('192.168.') or ip.startswith('127.') or ip.startswith('169.254.'):
+        return None, None, None
+    if ip.startswith('172.'):
+        try:
+            sec = int(ip.split('.')[1])
+            if 16 <= sec <= 31:
+                return None, None, None
+        except Exception:
+            pass
+
+    try:
+        import geoip2.database  # type: ignore
+        db_path = os.path.join(os.path.dirname(__file__), 'GeoLite2-City.mmdb')
+        if not os.path.exists(db_path):
+            return None, None, None
+
+        with geoip2.database.Reader(db_path) as reader:
+            r = reader.city(ip)
+            country = (r.country.iso_code or '') if r.country else ''
+            region = ''
+            if r.subdivisions and len(r.subdivisions) > 0:
+                region = r.subdivisions.most_specific.iso_code or r.subdivisions.most_specific.name or ''
+            city = (r.city.name or '') if r.city else ''
+            return country or None, region or None, city or None
+    except Exception:
+        return None, None, None
+
+
+@app.after_request
+def track_pageviews(response):
+    """Log a pageview for GET HTML responses (privacy-friendly, first-party)."""
+    try:
+        # Only track successful-ish HTML GET requests.
+        if request.method != 'GET':
+            return response
+        if response.status_code >= 400:
+            return response
+        ctype = (response.headers.get('Content-Type') or '').lower()
+        if 'text/html' not in ctype:
+            return response
+
+        # Avoid tracking internal/static endpoints.
+        path = request.path or '/'
+        if path.startswith('/static/'):
+            return response
+        if path in ('/robots.txt', '/llms.txt'):
+            return response
+        if path.startswith('/dashboard/') or path == '/dashboard':
+            return response
+
+        # Create/keep a first-party visitor id cookie.
+        visitor_id = request.cookies.get('visitor_id')
+        if not visitor_id:
+            visitor_id = uuid.uuid4().hex
+            # cookie set below on the response
+
+        ip = _get_client_ip()
+        country, region, city = _best_effort_geo_from_ip(ip)
+
+        db.log_metric_event(
+            event_type='pageview',
+            path=path,
+            method=request.method,
+            status_code=response.status_code,
+            referrer=request.referrer,
+            user_agent=request.headers.get('User-Agent'),
+            ip=ip,
+            visitor_id=visitor_id,
+            country=country,
+            region=region,
+            city=city,
+        )
+
+        if not request.cookies.get('visitor_id'):
+            response.set_cookie(
+                'visitor_id',
+                visitor_id,
+                max_age=60 * 60 * 24 * 365,
+                httponly=True,
+                samesite='Lax',
+            )
+        return response
+    except Exception as e:
+        print(f"track_pageviews error: {e}")
+        return response
+
+@app.route('/dashboard/metrics', methods=['GET'])
+def dashboard_metrics():
+    if not is_authenticated():
+        return redirect(url_for('login'))
+
+    site_title = db.get_site_title()
+    try:
+        days = int(request.args.get('days', 30))
+    except Exception:
+        days = 30
+    if days < 1:
+        days = 1
+    if days > 3650:
+        days = 3650
+
+    summary = db.get_metrics_summary(days=days)
+    return render_template('dashboard/metrics.html', site_title=site_title, summary=summary, days=days)
+
+
+@app.route('/dashboard/metrics/cleanup', methods=['POST'])
+def dashboard_metrics_cleanup():
+    if not is_authenticated():
+        return redirect(url_for('login'))
+
+    try:
+        retain_days = int(request.form.get('retain_days', 180))
+    except Exception:
+        retain_days = 180
+
+    if retain_days < 7:
+        retain_days = 7
+
+    deleted = db.delete_metrics_older_than(days=retain_days)
+    flash(f'Deleted {deleted} metrics events older than {retain_days} days')
+    return redirect(url_for('dashboard_metrics'))
 
 # This app object is used by Gunicorn. To run with Gunicorn:
 # gunicorn -c gunicorn_config.py app:app

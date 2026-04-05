@@ -1,0 +1,12 @@
+# llms.txt
+# Policy for large language models and AI data collection.
+# This site does not grant permission to scrape, train on, or otherwise use
+# the content for machine learning/LLM purposes.
+
+User-agent: *
+Disallow: /
+
+# Notes:
+# - This file is a voluntary signal and not enforceable by itself.
+# - If you operate a crawler/LLM, please respect this request.
+

@@ -1,268 +1,479 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
-{% block title %}{{ site_title }} - {{ commission.title }}{% endblock %}
+{% block head_extra %}
+<link
+  rel="stylesheet"
+  href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+/>
+<!-- Discord / social embed -->
+<meta property="og:type" content="article" />
+<meta property="og:title" content="{{ commission.title }}" />
 
-{% block content %}
-<div class="commission-detail">
-    <h1>{{ commission.title }}</h1>
+<meta property="og:description"
+      content="{{ commission.artist_name }}{% if commission.commission_date %} • {{ commission.commission_date.strftime('%b %d, %Y') }}{% endif %}" />
 
-    <div class="commission-layout">
-        <div class="commission-images">
-            {% if images %}
-            <div class="carousel" data-total-slides="{{ images|length }}">
-                <div class="carousel-inner">
-                    {% for image in images %}
-                    <div class="carousel-item" id="slide-{{ loop.index }}">
-                        <img src="{{ url_for('static', filename='uploads/commissions/' + image.filename) }}" alt="{{ commission.title }} - Image {{ loop.index }}">
-                    </div>
-                    {% endfor %}
-                </div>
+{% if images and images|length > 0 %}
+  <meta property="og:image"
+        content="{{ url_for('static', filename='uploads/commissions/' ~ images[0].filename, _external=True) }}" />
+{% endif %}
 
-                {% if images|length > 1 %}
-                <button class="carousel-control prev" onclick="prevSlide()">❮</button>
-                <button class="carousel-control next" onclick="nextSlide()">❯</button>
+<meta property="og:url" content="{{ request.url }}" />
+<meta property="og:site_name" content="{{ site_title or 'Art Commission Gallery' }}" />
 
-                <div class="carousel-indicators">
-                    {% for image in images %}
-                    <button class="indicator" data-slide="{{ loop.index }}" id="indicator-{{ loop.index }}"></button>
-                    {% endfor %}
-                </div>
-                {% endif %}
-            </div>
-            {% else %}
-            <div class="no-images">
-                <p>No images available for this commission.</p>
-            </div>
-            {% endif %}
-        </div>
+<meta name="twitter:card" content="summary_large_image" />
 
-        <div class="commission-details">
-            <div class="detail-item">
-                <h3>Artist</h3>
-                <p>{{ commission.artist_name }}</p>
-            </div>
+<style>
+  .cd-title { margin:0; font-size: clamp(1.6rem, 2vw + 1rem, 2.2rem); font-weight: 700; line-height: 1.2; }
+  .cd-sub   { color: var(--muted); font-size: .95rem; margin-top: .25rem; }
 
-            <div class="detail-item">
-                <h3>Date</h3>
-                <p>{{ commission.commission_date.strftime('%Y-%m-%d') if commission.commission_date else 'N/A' }}</p>
-            </div>
+  /* Header */
+  .cd-header { display:flex; align-items:flex-start; justify-content:space-between; gap: 1rem; margin-bottom: 1.25rem; }
+  .cd-header-actions { display:flex; gap:.5rem; flex-wrap: wrap; }
+  .cd-header .btn { margin-top: .25rem; }
 
-            {% if commission.price %}
-            <div class="detail-item">
-                <h3>Price</h3>
-                <p>${{ commission.price }}</p>
-            </div>
-            {% endif %}
+  /* Layout */
+  .cd-wrap { display: grid; grid-template-columns: 1.35fr 1fr; gap: 1.5rem; }
+  @media (max-width: 992px) { .cd-wrap { grid-template-columns: 1fr; } }
 
-            {% if commission.description %}
-            <div class="detail-item">
-                <h3>Description</h3>
-                <p>{{ commission.description }}</p>
-            </div>
-            {% endif %}
+  /* Card */
+  .cd-card { background: var(--card); border: 1px solid var(--border); border-radius: .75rem; overflow: hidden; }
+  .cd-card-body { padding: 1rem; display: grid; gap: 1rem; }
+  .cd-section { display: grid; gap: .35rem; }
+  .cd-section + .cd-section { margin-top: .25rem; }
 
-            {% if commission.commission_link %}
-            <div class="detail-item">
-                <h3>Commission Link</h3>
-                <p><a href="{{ commission.commission_link }}" target="_blank" class="btn">Visit Commission Page</a></p>
-            </div>
-            {% endif %}
+  /* New two-column grid inside card */
+  .cd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem 1.5rem; }
+  .cd-group { display: flex; flex-direction: column; gap: .25rem; }
+  @media (max-width: 700px) { .cd-grid { grid-template-columns: 1fr; } }
 
-            {% if commission.social_links %}
-            <div class="detail-item">
-                <h3>Artist Social Links</h3>
-                <p>{{ commission.social_links }}</p>
-            </div>
-            {% endif %}
+  /* Labels & values */
+  .cd-label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  .cd-value { font-weight: 500; }
+  .cd-desc  { white-space: pre-wrap; font-weight: 400; }
 
-            {% if commission.custom_ref_link %}
-            <div class="detail-item">
-                <h3>Custom References</h3>
-                <p><a href="{{ url_for('custom_reference', link_id=commission.custom_ref_link) }}" class="btn">View Custom References</a></p>
-            </div>
-            {% endif %}
+  /* Buttons (universal arrow) */
+  .btn {
+    display:inline-flex;
+    align-items:center;
+    gap:.5rem;
+    padding:.5rem .8rem;
+    border-radius:.5rem;
+    border:1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    text-decoration:none;
+    font-weight: 500;
+  }
+  .btn:hover { background: rgba(255,255,255,0.04); }
 
-            {% if session.get('authenticated') %}
-            <div class="admin-actions">
-                <a href="{{ url_for('dashboard_edit_commission', commission_id=commission.id) }}" class="btn">Edit Commission</a>
-                <form method="POST" action="{{ url_for('dashboard_delete_commission', commission_id=commission.id) }}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete this commission?');">
-                    <button type="submit" class="btn btn-danger">Delete Commission</button>
-                </form>
-            </div>
-            {% endif %}
-        </div>
-    </div>
+  /* Ensure bootstrap variant buttons keep their intended colors */
+  .btn.btn-primary,
+  .btn.btn-danger {
+    color: #fff;
+  }
 
-    <div class="back-link">
-        <a href="{{ url_for('commissions') }}" class="btn btn-back">
-            <i class="fas fa-arrow-left"></i>Back to All Commissions
-        </a>
-    </div>
-</div>
+  /* Social link chips */
+  .cd-links { display:flex; flex-wrap:wrap; gap:.5rem; }
+  .cd-linkpill {
+    display:inline-flex; align-items:center; gap:.4rem;
+    padding:.35rem .6rem; border:1px solid var(--border);
+    border-radius:.5rem; text-decoration:none; color: var(--text);
+    font-weight: 500;
+  }
+
+  /* Gallery (namespaced) */
+  .cds { position: relative; border-radius: .75rem; background: #000; border: 1px solid var(--border); overflow: hidden; }
+  .cds-rail { display:flex; transition: transform .35s ease; }
+  .cds-item { flex: 0 0 100%; display:flex; align-items:center; justify-content:center; background:#000; }
+  .cds-img { display:block; width: 100%; height: auto; max-height: 70vh; object-fit: contain; background:#000; }
+  .cds-ctrl { position:absolute; top:50%; transform:translateY(-50%); border:0; background: rgba(0,0,0,.45); color:#fff; padding:.5rem .75rem; border-radius:.5rem; cursor:pointer; }
+  .cds-ctrl.prev { left:.5rem; }
+  .cds-ctrl.next { right:.5rem; }
+  .cds-dots { position:absolute; left:0; right:0; bottom:.5rem; display:flex; justify-content:center; gap:.4rem; }
+  .cds-dot { width:8px; height:8px; border-radius:50%; border:1px solid #fff; background:transparent; opacity:.7; }
+  .cds-dot.active { background:#fff; opacity:1; }
+
+  /* Modal (namespaced) */
+  .cm-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); display:none; z-index: 1050; }
+  .cm-modal-backdrop.show { display:block; }
+  .cm-modal { position: fixed; inset: 0; display:none; align-items:center; justify-content:center; z-index: 1060; }
+  .cm-modal.show { display:flex; }
+  .cm-modal-dialog { width: min(1200px, 92vw); height: min(900px, 92vh); display: flex; }
+  .cm-modal-content { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: .9rem; display: flex; flex-direction: column; width: 100%; min-height: 0; }
+  .cm-modal-header, .cm-modal-footer { padding: .9rem 1rem; border-bottom: 1px solid var(--border); }
+  .cm-modal-title { margin: 0; font-size: 1.2rem; font-weight: 700; }
+  .cm-modal-body { padding: 0; display: grid; grid-template-columns: 1.3fr .9fr; gap: 0; flex: 1 1 auto; min-height: 0; border-radius: 0 0 .9rem .9rem; overflow: hidden; }
+  @media (max-width: 992px) { .cm-modal-body { grid-template-columns: 1fr; } }
+  .cm-modal-media { background: #000; border-right: 1px solid var(--border); min-height: 0; display: flex; flex-direction: column; }
+  .cm-media-frame { position: relative; flex: 1 1 auto; min-height: 0; border-right: 1px solid var(--border); }
+  .cm-media-rail { flex: 1 1 auto; min-height: 0; display:flex; transition: transform .35s ease; }
+  .cm-media-item { flex: 0 0 100%; display:flex; align-items:center; justify-content:center; background:#000; }
+  .cm-media-img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; background:#000; }
+  .cm-media-controls button { position: absolute; top: 50%; transform: translateY(-50%); border: 0; background: rgba(0,0,0,.45); color:#fff; padding:.5rem .75rem; border-radius:.5rem; cursor:pointer; }
+  .cm-media-controls .prev { left: .5rem; }
+  .cm-media-controls .next { right: .5rem; }
+  .cm-media-dots { position:absolute; left:0; right:0; bottom:.5rem; display:flex; justify-content:center; gap:.4rem; }
+  .cm-media-dot { width:8px; height:8px; border-radius:50%; border:1px solid #fff; opacity:.7; background:transparent; }
+  .cm-media-dot.active { background:#fff; opacity:1; }
+  .cm-modal-aside { min-height: 0; overflow: auto; background: var(--card); color: var(--text); padding: 1rem; }
+  .cm-label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+  .cm-value { font-weight: 500; }
+  .cm-desc { white-space: pre-wrap; }
+</style>
+
+<!-- Modal-embed mode: hide navbar/footer/back button when in iframe or ?modal=1 -->
+<style id="embed-only-css">
+  body.embedded header,
+  body.embedded .site-header,
+  body.embedded nav,
+  body.embedded .navbar,
+  body.embedded .topbar,
+  body.embedded footer,
+  body.embedded .site-footer,
+  body.embedded .global-footer {
+    display: none !important;
+  }
+
+  /* Clean, minimal spacing inside modal */
+  body.embedded main,
+  body.embedded .container,
+  body.embedded .page-content,
+  body.embedded .commission-wrapper {
+    margin-top: 20px !important;
+    padding-top: 0 !important;
+  }
+
+  body.embedded .commission-detail-header {
+    margin-top: 10px !important;
+  }
+
+  body.embedded h1,
+  body.embedded h2 {
+    margin-top: 0 !important;
+  }
+</style>
+
+<script>
+(function(){
+  function hasModalFlag(){
+    return new URLSearchParams(window.location.search).has('modal') ||
+           /[#&?]modal=1(?:&|$)/.test(window.location.href);
+  }
+  function inIframe(){ try { return window.self !== window.top; } catch(e) { return true; } }
+  if (hasModalFlag() || inIframe()) {
+    document.documentElement.classList.add('embedded-root');
+    document.addEventListener('DOMContentLoaded', function(){
+      document.body.classList.add('embedded');
+
+      // Hide generic "Back" controls (existing behavior)
+      Array.from(document.querySelectorAll('a,button')).forEach(function(el){
+        var t = (el.textContent || '').trim().toLowerCase();
+        if (t === 'back' || t === '← back' || t.endsWith(' back')) {
+          el.style.display = 'none';
+        }
+      });
+
+      // NEW: Explicitly hide the “Back to all commissions” link
+      document.querySelectorAll('.hide-when-embedded').forEach(function(el){
+        el.style.display = 'none';
+      });
+
+      // (Optional belt-and-braces): hide by text match too
+      Array.from(document.querySelectorAll('a')).forEach(function(a){
+        if (/back to all commissions/i.test(a.textContent || '')) a.style.display = 'none';
+      });
+
+      // NEW: In embedded mode, open same-origin links in a new tab
+      Array.from(document.querySelectorAll('a[href]')).forEach(function(a){
+        try {
+          var url = new URL(a.getAttribute('href'), window.location.origin);
+          if (url.origin === window.location.origin) {
+            a.setAttribute('target', '_blank');
+            // keep noopener for safety; allow existing rel to persist
+            var rel = (a.getAttribute('rel') || '').split(/\s+/);
+            if (!rel.includes('noopener')) rel.push('noopener');
+            a.setAttribute('rel', rel.join(' ').trim());
+          }
+        } catch(e) { /* ignore malformed/JS links */ }
+      });
+    });
+  }
+})();
+</script>
 {% endblock %}
 
-{% block scripts %}
-<script>
-    let currentSlide = 1;
-    let totalSlides = 0;
+{% block content %}
+  <div class="cd-header">
+    <div>
+      <h1 class="cd-title">{{ commission.title }}</h1>
+      <div class="cd-sub">
+        by {{ commission.artist_name }}
+        {% if commission.commission_date %} · {{ commission.commission_date.strftime('%b %d, %Y') }}{% endif %}
+      </div>
+    </div>
 
-    // Get total slides from data attribute
-    const carousel = document.querySelector('.carousel');
-    if (carousel) {
-        totalSlides = parseInt(carousel.getAttribute('data-total-slides')) || 0;
+    <div class="cd-header-actions">
+      <!-- Back button (no arrow) -->
+        <button id="copy-link" class="btn btn-outline-contrast btn-no-arrow btn-sm">
+  <span class="copy-label">Share commission page</span>
+  <i class="bi bi-box-arrow-up-right ms-1"></i>
+</button>
+      <a class="btn btn-outline-contrast btn-no-arrow hide-when-embedded" href="{{ url_for('commissions') }}">← Back to all commissions</a>
+
+      {% if session.get('authenticated') %}
+        <!-- Admin actions (no arrows) -->
+        <a class="btn btn-outline-contrast btn-no-arrow"
+           href="{{ url_for('dashboard_edit_commission', commission_id=commission.id) }}">Edit</a>
+
+        <a class="btn btn-outline-contrast btn-no-arrow"
+           href="{{ url_for('dashboard_delete_commission', commission_id=commission.id) }}"
+           onclick="return confirm('Delete this commission?');">Delete</a>
+
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="cd-wrap">
+    <!-- LEFT: gallery -->
+    <div>
+      {% if images and images|length > 0 %}
+        <div class="cds" id="cds" data-total="{{ images|length }}">
+          <div class="cds-rail" id="cds-rail">
+            {% for img in images %}
+              <div class="cds-item">
+                <img class="cds-img no-right-click"
+                     src="{{ url_for('static', filename='uploads/commissions/' ~ img.filename) }}"
+                     alt="{{ commission.title }} image {{ loop.index }}">
+              </div>
+            {% endfor %}
+          </div>
+          {% if images|length > 1 %}
+            <button class="cds-ctrl prev" type="button" aria-label="Previous" onclick="cdsPrev()">❮</button>
+            <button class="cds-ctrl next" type="button" aria-label="Next" onclick="cdsNext()">❯</button>
+            <div class="cds-dots" id="cds-dots">
+              {% for img in images %}
+                <div class="cds-dot{% if loop.index0 == 0 %} active{% endif %}" data-i="{{ loop.index0 }}" onclick="cdsGo({{ loop.index0 }})"></div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="cds" style="aspect-ratio:16/9;"></div>
+      {% endif %}
+    </div>
+
+    <!-- RIGHT: details -->
+    <div class="cd-card">
+      <div class="cd-card-body">
+
+        <!-- 2-column grid -->
+        <div class="cd-grid">
+
+          <!-- Artist -->
+          <div class="cd-group">
+            <span class="cd-label">Artist</span>
+            <div class="cd-value">{{ commission.artist_name }}</div>
+          </div>
+
+          <!-- Social Links -->
+          <div class="cd-group">
+            <span class="cd-label">Social Links</span>
+            {% if commission.social_links %}
+              {% set raw = commission.social_links|string %}
+              {% set normalized = raw
+                  |replace("'", "")
+                  |replace('\r\n', '\n')
+                  |replace('\r', '\n')
+                  |replace(';', '\n')
+                  |replace(',', '\n')
+              %}
+              {% set links = normalized.split('\n') %}
+              <div class="cd-links">
+                {% for link in links if link and link|trim %}
+                  {% set clean = link|trim %}
+                  {% set href = clean if clean.startswith('http') else 'https://' ~ clean %}
+                  <a class="cd-linkpill" href="{{ href }}" target="_blank" rel="noopener">
+                    {{ clean.replace('https://','').replace('http://','').replace('www.','').split('/')[0] }}
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="cd-value">—</div>
+            {% endif %}
+          </div>
+
+          <!-- Date -->
+          <div class="cd-group">
+            <span class="cd-label">Date</span>
+            <div class="cd-value">
+              {{ commission.commission_date.strftime('%b %d, %Y') if commission.commission_date else 'N/A' }}
+            </div>
+          </div>
+
+          <!-- Price -->
+          <div class="cd-group">
+            <span class="cd-label">Price</span>
+            <div class="cd-value">{{ commission.price if commission.price else '—' }}</div>
+          </div>
+
+          <!-- Original Post -->
+          <div class="cd-group">
+            <span class="cd-label">Original Post</span>
+            {% if commission.commission_link %}
+              <a class="btn btn-outline-contrast" href="{{ commission.commission_link }}" target="_blank" rel="noopener">
+                Open link
+              </a>
+            {% else %}
+              <div class="cd-value">—</div>
+            {% endif %}
+          </div>
+
+          <!-- References -->
+          <div class="cd-group">
+            <span class="cd-label">References Used</span>
+            {% if commission.custom_ref_link %}
+              <a class="btn btn-outline-contrast"
+                 href="{{ url_for('custom_reference', link_id=commission.custom_ref_link) }}">
+                View Reference Selection
+              </a>
+            {% else %}
+              <a class="btn btn-outline-contrast" href="{{ url_for('references') }}">
+                Global References were used
+              </a>
+            {% endif %}
+          </div>
+
+        </div> <!-- end grid -->
+
+        <!-- Description (full width) -->
+        {% if commission.description %}
+          <div class="cd-section" style="grid-column: 1 / -1;">
+            <span class="cd-label">Description</span>
+            <div class="cd-desc">{{ commission.description }}</div>
+          </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Optional modal preserved -->
+  <div id="commission-backdrop" class="cm-modal-backdrop"></div>
+  <div id="commission-modal" class="cm-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
+    <div class="cm-modal-dialog">
+      <div class="cm-modal-content">
+        <div class="cm-modal-header">
+          <h2 id="modal-title" class="cm-modal-title">Title</h2>
+          <button type="button" class="cm-modal-close" aria-label="Close" onclick="closeCommissionModal()">×</button>
+        </div>
+
+        <div class="cm-modal-body">
+          <div class="cm-modal-media">
+            <div class="cm-media-frame">
+              <div id="cm-rail" class="cm-media-rail"></div>
+              <div class="cm-media-controls">
+                <button class="prev" type="button" onclick="cmPrev()">❮</button>
+                <button class="next" type="button" onclick="cmNext()">❯</button>
+              </div>
+              <div id="cm-dots" class="cm-media-dots"></div>
+            </div>
+          </div>
+
+          <aside class="cm-modal-aside">
+            <div class="cm-section">
+              <span class="cm-label">Artist</span>
+              <div id="cm-artist" class="cm-value">—</div>
+            </div>
+            <div class="cm-section">
+              <span class="cm-label">Date</span>
+              <div id="cm-date" class="cm-value">—</div>
+            </div>
+            <div class="cm-section" id="cm-price-wrap" style="display:none">
+              <span class="cm-label">Price</span>
+              <div id="cm-price" class="cm-value">—</div>
+            </div>
+            <div class="cm-section" id="cm-op-wrap" style="display:none">
+              <span class="cm-label">Original Post</span>
+              <div><a id="cm-op" class="btn btn-outline-contrast" href="#" target="_blank" rel="noopener">Open link</a></div>
+            </div>
+            <div class="cm-section" id="cm-ref-wrap" style="display:none">
+              <span class="cm-label">References used</span>
+              <div><a id="cm-ref" class="btn btn-outline-contrast" href="#">View custom reference</a></div>
+            </div>
+            <div class="cm-section" id="cm-desc-wrap" style="display:none">
+              <span class="cm-label">Description</span>
+              <div id="cm-desc" class="cm-desc"></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // On-page gallery controls
+    (function(){
+      const rail = document.getElementById('cds-rail');
+      if (!rail) return;
+      const total = parseInt(document.getElementById('cds').getAttribute('data-total') || '0', 10);
+      let idx = 0;
+      function sync(){ rail.style.transform = `translateX(-${idx * 100}%)`; document.querySelectorAll('.cds-dot').forEach((d, i) => d.classList.toggle('active', i === idx)); }
+      window.cdsNext = function(){ if (total < 2) return; idx = (idx + 1) % total; sync(); }
+      window.cdsPrev = function(){ if (total < 2) return; idx = (idx - 1 + total) % total; sync(); }
+      window.cdsGo   = function(i){ if (total < 2) return; idx = Math.max(0, Math.min(total - 1, i)); sync(); }
+      let x0 = null;
+      rail.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+      rail.addEventListener('touchend',   e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) { if (dx < 0) cdsNext(); else cdsPrev(); } x0 = null; }, { passive: true });
+      sync();
+    })();
+
+    // Modal controls (same as previous versions)
+    let cmIdx = 0, cmTotal = 0;
+    function openCommissionModal(data){
+      document.getElementById('modal-title').textContent = data.title || '—';
+      document.getElementById('cm-artist').textContent   = data.artist_name || '—';
+      document.getElementById('cm-date').textContent     = data.commission_date || '—';
+      if (data.price) { cmShow('cm-price-wrap', true);  document.getElementById('cm-price').textContent = data.price; } else cmShow('cm-price-wrap', false);
+      if (data.commission_link) { cmShow('cm-op-wrap', true); document.getElementById('cm-op').href = data.commission_link; } else cmShow('cm-op-wrap', false);
+      if (data.custom_ref_link) { cmShow('cm-ref-wrap', true); document.getElementById('cm-ref').href = data.custom_ref_link_url || data.custom_ref_link; } else cmShow('cm-ref-wrap', false);
+      if (data.description) { cmShow('cm-desc-wrap', true); document.getElementById('cm-desc').textContent = data.description; } else cmShow('cm-desc-wrap', false);
+      const rail = document.getElementById('cm-rail'); const dots = document.getElementById('cm-dots'); rail.innerHTML = ''; dots.innerHTML = '';
+      const images = Array.isArray(data.images) ? data.images : []; cmTotal = images.length;
+      if (cmTotal === 0) { const empty = document.createElement('div'); empty.className = 'cm-media-item'; empty.innerHTML = '<div style="color:#888;padding:1rem;">No images</div>'; rail.appendChild(empty); cmTotal = 1; toggleControls(false); }
+      else { images.forEach((img, i) => { const item = document.createElement('div'); item.className = 'cm-media-item'; const el = document.createElement('img'); el.className = 'cm-media-img no-right-click'; el.alt = (data.title || 'Image') + ' ' + (i+1); el.src = img.url || img.src || (img.filename ? `/static/uploads/commissions/${img.filename}` : ''); item.appendChild(el); rail.appendChild(item); if (images.length > 1) { const dot = document.createElement('button'); dot.type = 'button'; dot.className = 'cm-media-dot' + (i===0 ? ' active' : ''); dot.addEventListener('click', () => cmGo(i)); dots.appendChild(dot); } }); toggleControls(images.length > 1); }
+      cmIdx = 0; cmSync();
+      document.getElementById('commission-backdrop').classList.add('show');
+      document.getElementById('commission-modal').classList.add('show');
+      document.body.style.overflow = 'hidden';
     }
+    function closeCommissionModal(){ document.getElementById('commission-backdrop').classList.remove('show'); document.getElementById('commission-modal').classList.remove('show'); document.body.style.overflow = ''; }
+    function toggleControls(on){ document.querySelectorAll('.cm-media-controls button').forEach(b => b.style.display = on ? '' : 'none'); const dots = document.getElementById('cm-dots'); if (dots) dots.style.display = on ? '' : 'none'; }
+    function cmSync(){ const rail = document.getElementById('cm-rail'); rail.style.transform = `translateX(-${cmIdx * 100}%)`; document.querySelectorAll('.cm-media-dot').forEach((d,i)=> d.classList.toggle('active', i===cmIdx)); }
+    function cmNext(){ if (cmTotal < 2) return; cmIdx = (cmIdx + 1) % cmTotal; cmSync(); }
+    function cmPrev(){ if (cmTotal < 2) return; cmIdx = (cmIdx - 1 + cmTotal) % cmTotal; cmSync(); }
+    function cmGo(i){ if (cmTotal < 2) return; cmIdx = Math.max(0, Math.min(cmTotal-1, i)); cmSync(); }
+    function cmShow(id, on){ const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; }
+    document.addEventListener('keydown', e => { const open = document.getElementById('commission-modal').classList.contains('show'); if (!open) return; if (e.key === 'Escape') closeCommissionModal(); if (e.key === 'ArrowRight') cmNext(); if (e.key === 'ArrowLeft') cmPrev(); });
+    (function swipe(){ const rail = document.getElementById('cm-rail'); if (!rail) return; let x0 = null; rail.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true }); rail.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; if (Math.abs(dx) > 40) (dx < 0 ? cmNext() : cmPrev()); x0 = null; }, { passive: true }); })();
+    // Copy link
+    const copyButton = document.getElementById('copy-link');
+if (copyButton) {
+  copyButton.addEventListener('click', function() {
+    const url = new URL('{{ request.url }}');
+    const cleanUrl = url.origin + url.pathname;
 
-    function showSlide(n) {
-        // Update current slide
-        currentSlide = n;
+    const tempInput = document.createElement('input');
+    tempInput.value = cleanUrl;
+    document.body.appendChild(tempInput);
+    tempInput.select();
+    document.execCommand('copy');
+    document.body.removeChild(tempInput);
 
-        // Handle wrapping
-        if (currentSlide > totalSlides) {
-            currentSlide = 1;
-        } else if (currentSlide < 1) {
-            currentSlide = totalSlides;
-        }
+    const label = copyButton.querySelector('.copy-label');
+    label.textContent = 'Link copied!';
+    setTimeout(() => label.textContent = 'Share commission page', 1500);
+  });
+}
 
-        // Update carousel position
-        const carouselInner = document.querySelector('.carousel-inner');
-        if (carouselInner) {
-            carouselInner.style.transform = `translateX(-${(currentSlide - 1) * 100}%)`;
-        }
-
-        // Update indicators
-        const indicators = document.querySelectorAll('.indicator');
-        indicators.forEach((indicator, index) => {
-            if (index + 1 === currentSlide) {
-                indicator.classList.add('active');
-            } else {
-                indicator.classList.remove('active');
-            }
-        });
-    }
-
-    // Update social links if available
-        const socialLinksContainer = document.getElementById('modal-social-links-container');
-        if (commission.social_links) {
-            const socialLinksElement = document.getElementById('modal-social-links');
-            socialLinksElement.innerHTML = '';
-            socialLinksElement.className = 'social-links';
-
-            // Parse social links and create clickable links
-            const links = commission.social_links.split(/[,\n]+/).map(link => link.trim()).filter(link => link);
-
-            links.forEach(link => {
-                // Check if it's a URL or just text
-                if (link.match(/^https?:\/\//i) || link.match(/^www\./i)) {
-                    // It's a URL - create a link with appropriate icon
-                    const a = document.createElement('a');
-                    a.href = link.match(/^https?:\/\//i) ? link : `https://${link}`;
-                    a.target = '_blank';
-                    a.className = 'social-link generic';
-
-                    // Determine icon based on URL
-                    let icon = 'fa-globe';
-                    let platform = 'generic';
-
-                    a.className = `social-link ${platform}`;
-
-                    // Create icon
-                    const i = document.createElement('i');
-                    i.className = `fas ${icon}`;
-                    a.appendChild(i);
-
-                    // Create text
-                    const displayText = link.replace(/^https?:\/\/(www\.)?/i, '').split('/')[0];
-                    const span = document.createElement('span');
-                    span.textContent = displayText;
-                    a.appendChild(span);
-
-                    socialLinksElement.appendChild(a);
-                } else if (link.includes(':')) {
-                    // It's in format "Platform: handle"
-                    const [platform, handle] = link.split(':').map(part => part.trim());
-
-                    // Determine platform details
-                    let url = null;
-                    let icon = 'fa-globe';
-                    let platformClass = 'generic';
-
-                    // Create link element
-                    const a = document.createElement('a');
-                    a.className = `social-link ${platformClass}`;
-
-                    if (url) {
-                        a.href = url;
-                        a.target = '_blank';
-
-                        // Add icon
-                        const i = document.createElement('i');
-                        i.className = `fab ${icon}`;
-                        a.appendChild(i);
-
-                        // Add display text
-                        const displayText = platform + ': ' + handle;
-                        const span = document.createElement('span');
-                        span.textContent = displayText;
-                        a.appendChild(span);
-                    } else {
-                        // No URL could be determined, just show as text with generic icon
-                        const i = document.createElement('i');
-                        i.className = 'fas fa-link';
-                        a.appendChild(i);
-
-                        const span = document.createElement('span');
-                        span.textContent = link;
-                        a.appendChild(span);
-                    }
-
-                    socialLinksElement.appendChild(a);
-                } else {
-                    // Just text - create a non-clickable styled element
-                    const div = document.createElement('div');
-                    div.className = 'social-link generic';
-
-                    const i = document.createElement('i');
-                    i.className = 'fas fa-info-circle';
-                    div.appendChild(i);
-
-                    const span = document.createElement('span');
-                    span.textContent = link;
-                    div.appendChild(span);
-
-                    socialLinksElement.appendChild(div);
-                }
-            });
-
-            socialLinksContainer.style.display = '';
-        } else {
-            socialLinksContainer.style.display = 'none';
-        }
-
-    function nextSlide() {
-        showSlide(currentSlide + 1);
-    }
-
-    function prevSlide() {
-        showSlide(currentSlide - 1);
-    }
-
-    function goToSlide(n) {
-        showSlide(n);
-    }
-
-    // Initialize carousel
-    document.addEventListener('DOMContentLoaded', function() {
-        // Add click event listeners to indicators
-        document.querySelectorAll('.indicator').forEach(indicator => {
-            indicator.addEventListener('click', function() {
-                const slideNumber = parseInt(this.getAttribute('data-slide'));
-                goToSlide(slideNumber);
-            });
-        });
-
-        if (totalSlides > 0) {
-            showSlide(1);
-        }
-    });
-</script>
+  </script>
 {% endblock %}

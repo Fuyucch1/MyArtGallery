@@ -1,311 +1,386 @@
-{% extends 'layout.html' %}
+{% extends 'base.html' %}
 
 {% block title %}{{ site_title }} - Manage References{% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+<style>
+  /* Page-specific helpers */
+  .filters .form-label{ font-weight:600; }
+  .filters .form-control, .filters .form-select{ background: var(--input, var(--card)); color: var(--text); border:1px solid var(--border); }
+  .filters .btn{ white-space: nowrap; }
+
+  /* Table theming (dark-mode safe) */
+  .table-responsive{ background: var(--card) !important; }
+  .table, .table thead, .table tbody, .table tfoot, .table tr, .table td, .table th{
+    background-color: var(--card) !important; color: var(--text) !important; border-color: var(--border) !important;
+  }
+  .table>:not(caption)>*>*{ background-color: inherit !important; color: inherit !important; }
+  .references-table thead th{ background: var(--card) !important; border-bottom:1px solid var(--border) !important; font-weight:600; }
+  .references-table td, .references-table th{ vertical-align: middle; }
+
+  .badge-soft{ background: color-mix(in srgb, var(--brand) 15%, transparent); color: color-mix(in srgb, var(--brand) 85%, #fff); border:1px solid color-mix(in srgb, var(--brand) 35%, transparent); padding:.125rem .5rem; border-radius:.5rem; }
+  .status-pill{ display:inline-block; padding:.125rem .5rem; border-radius:999px; border:1px solid var(--border); }
+
+  .btn-brand{ color:#fff; background:linear-gradient(90deg, var(--brand), var(--brand-2)); border:1px solid color-mix(in srgb, var(--brand) 45%, transparent); box-shadow:0 6px 18px rgba(124,77,255,.25) }
+  .btn-brand:hover{ filter:brightness(1.05) }
+  .btn-danger-soft{ background: color-mix(in srgb, #ef4444 12%, transparent); color: color-mix(in srgb, #ef4444 90%, #fff); border:1px solid color-mix(in srgb, #ef4444 35%, transparent); }
+
+  /* Modal minimal styling aligned with cards */
+  .modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1050; }
+  .modal .modal-content{ background: var(--card); color: var(--text); border:1px solid var(--border); border-radius: .75rem; max-width: 520px; margin: 10vh auto; padding: 1rem 1.25rem; }
+  .modal .close{ cursor:pointer; float:right; font-size:1.25rem; line-height:1; }
+  .form-actions{ display:flex; gap:.5rem; justify-content:flex-end; }
+
+  /* Thumbnail cell */
+  .thumb{ max-width:100px; max-height:100px; border-radius:.5rem; border:1px solid var(--border); }
+  /* Filter styling restored */
+.filters .form-label{ font-weight:600; color:var(--text); }
+.filters .form-control,
+.filters .form-select{
+  background: var(--input, var(--card));
+  color: var(--text);
+  border:1px solid var(--border);
+}
+.filters .form-control:focus,
+.filters .form-select:focus{
+  border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent);
+}
+  .filters .form-select,
+  .filters .form-control{
+    background: var(--input, var(--card)) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border) !important;
+    box-shadow: none !important;
+  }
+  .filters .form-select:focus,
+  .filters .form-control:focus{
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent) !important;
+    border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
+  }
+  .filters .form-label{ color: var(--text) !important; }
+  .filters ::placeholder{ color: color-mix(in srgb, var(--text) 55%, transparent) !important; }
+  /* Polished filter styling (stronger specificity + custom arrow) */
+  .filters .form-label{ font-weight:600; color:var(--text) !important; margin-bottom:.35rem; }
+  .filters select,
+  .filters .form-select,
+  .filters .form-control{
+    background: var(--input, var(--card)) !important;
+    color: var(--text) !important;
+    border:1px solid var(--border) !important;
+    border-radius:.6rem !important;
+    padding:.5rem .9rem !important;
+    line-height:1.25 !important;
+    box-shadow:none !important;
+    -webkit-appearance: none;
+       -moz-appearance: none;
+            appearance: none;
+    background-image: url("data:image/svg+xml;utf8,\
+      <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23FFFFFF'>\
+        <path d='M3.2 5.8a1 1 0 0 1 1.4 0L8 9.2l3.4-3.4a1 1 0 1 1 1.4 1.4l-4.1 4.1a1 1 0 0 1-1.4 0L3.2 7.2a1 1 0 0 1 0-1.4z'/>\
+      </svg>");
+    background-repeat: no-repeat;
+    background-position: right .7rem center;
+    background-size: 16px 16px;
+  }
+  /* ensure arrow color follows theme text: swap white for current text via filter */
+  [data-theme="dark"] .filters select,
+  @media (prefers-color-scheme: dark){ .filters select{ filter: none; } }
+
+  .filters select option{ background: var(--card); color: var(--text); }
+  .filters .form-select:focus,
+  .filters .form-control:focus{ border-color: color-mix(in srgb, var(--brand) 55%, var(--border)); box-shadow:0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent) !important; }
+</style>
+<script>
+  // Failsafe: attach logic from HEAD so it doesn't depend on a missing foot block
+  (function(){
+    function ready(fn){ if(document.readyState !== 'loading') fn(); else document.addEventListener('DOMContentLoaded', fn); }
+    const norm = (v) => (v ?? '').toString().trim().toLowerCase();
+    function init(){
+      const table = document.getElementById('references-table');
+      const categoryFilter = document.getElementById('category-filter');
+      const folderFilter = document.getElementById('folder-filter');
+      const visibilityFilter = document.getElementById('visibility-filter');
+      if(!table){ console.warn('[refs] table not found'); return; }
+      const headerCells = Array.from(table.tHead ? table.tHead.rows[0].cells : []);
+      const idx = (label) => { const i = headerCells.findIndex(th => norm(th.textContent) === norm(label)); return i>=0?i:null; };
+      const colCategory = idx('category');
+      const colSubcat = idx('subcategory');
+      const colVisibility = idx('visibility');
+      function rows(){ return Array.from(table.tBodies[0]?.rows || []); }
+      function cellText(row, i){ if(i===null) return ''; const c=row.cells[i]; return norm(c?c.textContent:''); }
+      function getCat(r){ return colCategory!==null?cellText(r,colCategory):norm(r.dataset.category); }
+      function getSub(r){ return colSubcat!==null?cellText(r,colSubcat):norm(r.dataset.folder); }
+      function getVis(r){ return colVisibility!==null?cellText(r,colVisibility):norm(r.dataset.visibility); }
+      [categoryFilter, folderFilter, visibilityFilter].forEach(sel=>{ if(!sel) return; Array.from(sel.options).forEach(opt=>opt.value=norm(opt.value)); });
+      function apply(){
+        const catV = norm(categoryFilter?.value);
+        const folV = norm(folderFilter?.value);
+        const visV = norm(visibilityFilter?.value);
+
+        rows().forEach(r=>{
+          const ok = (!catV || getCat(r)===catV) && (!folV || getSub(r)===folV) && (!visV || getVis(r)===visV);
+          r.style.display = ok ? 'table-row' : 'none';
+        });
+      }
+      // expose + bind
+      window.__applyRefFilters = apply;
+      ['change','input'].forEach(evt=>{
+        categoryFilter&&categoryFilter.addEventListener(evt, apply);
+        folderFilter&&folderFilter.addEventListener(evt, apply);
+        visibilityFilter&&visibilityFilter.addEventListener(evt, apply);
+      });
+      apply();
+    }
+    ready(init);
+  })();
+</script>
+{% endblock %}
+
 {% block content %}
-<h1>Manage References</h1>
-<p>View, add, edit, and delete reference images.</p>
 
-<div class="dashboard-actions">
-    <a href="{{ url_for('dashboard') }}" class="btn">Back to Dashboard</a>
-    <a href="{{ url_for('dashboard_add_reference') }}" class="btn">Add New Reference</a>
-    <a href="{{ url_for('dashboard_generate_miniatures') }}" class="btn" title="Generate miniature versions of all references for faster loading">Generate Miniatures</a>
-</div>
-
-<div class="filter-controls">
-    <h3>Filter References</h3>
-    <div class="form-group">
-        <label for="category-filter">Category:</label>
-        <div class="filter-with-action">
-            <select id="category-filter" class="form-control">
-                <option value="">All Categories</option>
-                {% for category in categories %}
-                <option value="{{ category }}">{{ category }}</option>
-                {% endfor %}
-            </select>
-            <button type="button" id="rename-category-btn" class="btn btn-sm" title="Rename Selected Category"><i class="fas fa-edit"></i> Rename</button>
-        </div>
+<section class="hero rounded-3 p-4 mb-4 dash-header">
+  <div class="d-flex align-items-start justify-content-between flex-wrap gap-3">
+    <div>
+      <h1 class="mb-1">Manage References</h1>
+      <p class="subtitle mb-0">View, add, edit, and delete reference images.</p>
     </div>
-
-    <div class="form-group">
-        <label for="folder-filter">Subcategory:</label>
-        <div class="filter-with-action">
-            <select id="folder-filter" class="form-control">
-                <option value="">All Subcategories</option>
-                {% for folder in folders %}
-                <option value="{{ folder }}">{{ folder }}</option>
-                {% endfor %}
-            </select>
-            <button type="button" id="rename-subcategory-btn" class="btn btn-sm" title="Rename Selected Subcategory"><i class="fas fa-edit"></i> Rename</button>
-        </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('dashboard') }}" class="btn btn-outline-contrast btn-sm"><i class="bi bi-layout-text-sidebar-reverse me-1"></i> Back to Dashboard</a>
+      <a href="{{ url_for('dashboard_add_reference') }}" class="btn btn-brand btn-sm"><i class="bi bi-image me-1"></i> Add New Reference</a>
+      <a href="{{ url_for('dashboard_generate_miniatures') }}" class="btn btn-outline-contrast btn-sm" title="Generate miniature versions of all references for faster loading"><i class="bi bi-lightning-charge me-1"></i> Generate Miniatures</a>
     </div>
+  </div>
+</section>
 
-    <div class="form-group">
-        <label for="visibility-filter">Visibility:</label>
-        <select id="visibility-filter" class="form-control">
-            <option value="">All</option>
-            <option value="public">Public</option>
-            <option value="private">Private</option>
+<div class="card section-card p-4 mb-4 filters">
+  <h2 class="h5 mb-3">Filter References</h2>
+  <div class="row g-3 align-items-end">
+    <div class="col-12 col-md-4">
+      <label for="category-filter" class="form-label">Category</label>
+        <select id="category-filter"$1 onchange="window.__applyRefFilters && window.__applyRefFilters()" oninput="window.__applyRefFilters && window.__applyRefFilters()">
+          <option value="">All Categories</option>
+          {% for category in categories %}
+          <option value="{{ category }}">{{ category }}</option>
+          {% endfor %}
         </select>
     </div>
+    <div class="col-12 col-md-4">
+      <label for="folder-filter" class="form-label">Subcategory</label>
+        <select id="folder-filter"$1 onchange="window.__applyRefFilters && window.__applyRefFilters()" oninput="window.__applyRefFilters && window.__applyRefFilters()">
+          <option value="">All Subcategories</option>
+          {% for folder in folders %}
+          <option value="{{ folder }}">{{ folder }}</option>
+          {% endfor %}
+        </select>
+
+    </div>
+    <div class="col-12 col-md-4">
+      <label for="visibility-filter" class="form-label">Visibility</label>
+      <select id="visibility-filter"$1 onchange="window.__applyRefFilters && window.__applyRefFilters()" oninput="window.__applyRefFilters && window.__applyRefFilters()">
+        <option value="">All</option>
+        <option value="public">Public</option>
+        <option value="private">Private</option>
+      </select>
+    </div>
+  </div>
 </div>
 
-{% if references %}
-<table id="references-table">
-    <thead>
+<div class="card section-card p-0 overflow-hidden">
+  {% if references %}
+  <div class="table-responsive">
+    <table id="references-table" class="table mb-0 align-middle references-table">
+      <thead>
         <tr>
-            <th>Thumbnail</th>
-            <th>Category</th>
-            <th>Subcategory</th>
-            <th>Visibility</th>
-            <th>Watermarked</th>
-            <th>Upload Date</th>
-            <th>Actions</th>
+          <th>Thumbnail</th>
+          <th>Category</th>
+          <th>Subcategory</th>
+          <th>Visibility</th>
+          <th>Watermarked</th>
+          <th>Upload Date</th>
+          <th class="text-end">Actions</th>
         </tr>
-    </thead>
-    <tbody>
+      </thead>
+      <tbody>
         {% for ref in references %}
         <tr data-category="{{ ref.category }}" data-folder="{{ ref.subcategory }}" data-visibility="{{ 'public' if ref.public else 'private' }}">
-            <td>
-                <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" style="max-width: 100px; max-height: 100px;">
-            </td>
-            <td>{{ ref.category }}</td>
-            <td>{{ ref.subcategory }}</td>
-            <td>{{ 'Public' if ref.public else 'Private' }}</td>
-            <td>{{ 'Yes' if ref.watermarked else 'No' }}</td>
-            <td>{{ ref.upload_date.strftime('%Y-%m-%d') }}</td>
-            <td>
-                <a href="{{ url_for('dashboard_edit_reference', ref_id=ref.id) }}" class="btn btn-icon" title="Edit"><i class="fas fa-edit"></i></a>
-                <form method="POST" action="{{ url_for('dashboard_delete_reference', ref_id=ref.id) }}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete this reference?');">
-                    <button type="submit" class="btn btn-danger btn-icon" title="Delete"><i class="fas fa-trash"></i></button>
-                </form>
-            </td>
+          <td>
+            <img src="{{ url_for('static', filename='uploads/references/' + ref.filename) }}" alt="Reference" class="thumb">
+          </td>
+          <td>{{ ref.category }}</td>
+          <td>{{ ref.subcategory }}</td>
+          <td>
+            {% if ref.public %}
+              <span class="status-pill">Public</span>
+            {% else %}
+              <span class="status-pill">Private</span>
+            {% endif %}
+          </td>
+          <td>{{ 'Yes' if ref.watermarked else 'No' }}</td>
+          <td>{{ ref.upload_date.strftime('%Y-%m-%d') }}</td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-2">
+              <a href="{{ url_for('dashboard_edit_reference', ref_id=ref.id) }}" class="btn btn-outline-contrast btn-sm" title="Edit"><i class="bi bi-pencil"></i></a>
+              <form method="POST" action="{{ url_for('dashboard_delete_reference', ref_id=ref.id) }}" class="inline-form" onsubmit="return confirm('Are you sure you want to delete this reference?');">
+                <button type="submit" class="btn btn-danger-soft btn-sm" title="Delete"><i class="bi bi-trash"></i></button>
+              </form>
+            </div>
+          </td>
         </tr>
         {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No references available.</p>
-{% endif %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-4">
+    <p class="mb-3">No references available.</p>
+    <a href="{{ url_for('dashboard_add_reference') }}" class="btn btn-brand btn-sm"><i class="bi bi-image me-1"></i> Add Reference</a>
+  </div>
+  {% endif %}
+</div>
+
 <!-- Rename Category Modal -->
 <div id="rename-category-modal" class="modal">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <h2>Rename Category</h2>
-        <form id="rename-category-form">
-            <div class="form-group">
-                <label for="old-category">Current Category:</label>
-                <input type="text" id="old-category" name="old_category" class="form-control" readonly>
-            </div>
-            <div class="form-group">
-                <label for="new-category">New Category Name:</label>
-                <input type="text" id="new-category" name="new_category" class="form-control" required>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn">Rename</button>
-                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
-            </div>
-        </form>
-    </div>
+  <div class="modal-content">
+    <span class="close" data-close="category">&times;</span>
+    <h2 class="h5 mb-3">Rename Category</h2>
+    <form id="rename-category-form">
+      <div class="mb-3">
+        <label for="old-category" class="form-label">Current Category</label>
+        <input type="text" id="old-category" name="old_category" class="form-control" readonly>
+      </div>
+      <div class="mb-3">
+        <label for="new-category" class="form-label">New Category Name</label>
+        <input type="text" id="new-category" name="new_category" class="form-control" required>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-brand">Rename</button>
+        <button type="button" class="btn btn-outline-contrast" data-close="category">Cancel</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Rename Subcategory Modal -->
 <div id="rename-subcategory-modal" class="modal">
-    <div class="modal-content">
-        <span class="close">&times;</span>
-        <h2>Rename Subcategory</h2>
-        <form id="rename-subcategory-form">
-            <div class="form-group">
-                <label for="category-for-subcategory">In Category:</label>
-                <select id="category-for-subcategory" name="category" class="form-control">
-                    <option value="">All Categories</option>
-                    {% for category in categories %}
-                    <option value="{{ category }}">{{ category }}</option>
-                    {% endfor %}
-                </select>
-                <small>Leave as "All Categories" to rename this subcategory across all categories.</small>
-            </div>
-            <div class="form-group">
-                <label for="old-subcategory">Current Subcategory:</label>
-                <input type="text" id="old-subcategory" name="old_subcategory" class="form-control" readonly>
-            </div>
-            <div class="form-group">
-                <label for="new-subcategory">New Subcategory Name:</label>
-                <input type="text" id="new-subcategory" name="new_subcategory" class="form-control" required>
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn">Rename</button>
-                <button type="button" class="btn btn-secondary close-modal">Cancel</button>
-            </div>
-        </form>
-    </div>
+  <div class="modal-content">
+    <span class="close" data-close="subcategory">&times;</span>
+    <h2 class="h5 mb-3">Rename Subcategory</h2>
+    <form id="rename-subcategory-form">
+      <div class="mb-3">
+        <label for="category-for-subcategory" class="form-label">In Category</label>
+        <select id="category-for-subcategory" name="category" class="form-select">
+          <option value="">All Categories</option>
+          {% for category in categories %}
+          <option value="{{ category }}">{{ category }}</option>
+          {% endfor %}
+        </select>
+        <small class="helper">Leave as "All Categories" to rename this subcategory across all categories.</small>
+      </div>
+      <div class="mb-3">
+        <label for="old-subcategory" class="form-label">Current Subcategory</label>
+        <input type="text" id="old-subcategory" name="old_subcategory" class="form-control" readonly>
+      </div>
+      <div class="mb-3">
+        <label for="new-subcategory" class="form-label">New Subcategory Name</label>
+        <input type="text" id="new-subcategory" name="new_subcategory" class="form-control" required>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-brand">Rename</button>
+        <button type="button" class="btn btn-outline-contrast" data-close="subcategory">Cancel</button>
+      </div>
+    </form>
+  </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const categoryFilter = document.getElementById('category-filter');
-        const folderFilter = document.getElementById('folder-filter');
-        const visibilityFilter = document.getElementById('visibility-filter');
-        const rows = document.querySelectorAll('#references-table tbody tr');
+  (function(){
 
-        // Rename category elements
-        const renameCategoryBtn = document.getElementById('rename-category-btn');
-        const renameCategoryModal = document.getElementById('rename-category-modal');
-        const renameCategoryForm = document.getElementById('rename-category-form');
-        const oldCategoryInput = document.getElementById('old-category');
-        const newCategoryInput = document.getElementById('new-category');
+    function ready(fn){
+      if(document.readyState !== 'loading') fn();
+      else document.addEventListener('DOMContentLoaded', fn);
+    }
 
-        // Rename subcategory elements
-        const renameSubcategoryBtn = document.getElementById('rename-subcategory-btn');
-        const renameSubcategoryModal = document.getElementById('rename-subcategory-modal');
-        const renameSubcategoryForm = document.getElementById('rename-subcategory-form');
-        const categoryForSubcategorySelect = document.getElementById('category-for-subcategory');
-        const oldSubcategoryInput = document.getElementById('old-subcategory');
-        const newSubcategoryInput = document.getElementById('new-subcategory');
+    ready(function(){
 
-        // Close buttons
-        const closeButtons = document.querySelectorAll('.close, .close-modal');
+      const table = document.getElementById('references-table');
+      const categoryFilter = document.getElementById('category-filter');
+      const folderFilter = document.getElementById('folder-filter');
+      const visibilityFilter = document.getElementById('visibility-filter');
 
-        function applyFilters() {
-            const categoryValue = categoryFilter.value;
-            const folderValue = folderFilter.value;
-            const visibilityValue = visibilityFilter.value;
 
-            rows.forEach(row => {
-                const categoryMatch = !categoryValue || row.getAttribute('data-category') === categoryValue;
-                const folderMatch = !folderValue || row.getAttribute('data-folder') === folderValue;
-                const visibilityMatch = !visibilityValue || row.getAttribute('data-visibility') === visibilityValue;
 
-                if (categoryMatch && folderMatch && visibilityMatch) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
+      if(!table){ console.warn('[refs] #references-table not found – aborting init'); return; }
+
+      const norm = (v) => (v ?? '').toString().trim().toLowerCase();
+
+      // Find header indexes by label; fall back to data-* attributes
+      const headerCells = Array.from(table.tHead ? table.tHead.rows[0].cells : []);
+      const headerIndex = (label) => {
+        const i = headerCells.findIndex(th => norm(th.textContent) === norm(label));
+        return i >= 0 ? i : null;
+      };
+
+      const colCategory   = headerIndex('category');
+      const colSubcat     = headerIndex('subcategory');
+      const colVisibility = headerIndex('visibility');
+
+
+      const rows = () => Array.from(table.tBodies[0]?.rows || []);
+
+      function cellText(row, idx){
+        if(idx === null) return '';
+        const c = row.cells[idx];
+        return norm(c ? c.textContent : '');
+      }
+
+      function getCat(row){ return colCategory   !== null ? cellText(row, colCategory)   : norm(row.dataset.category); }
+      function getSub(row){ return colSubcat     !== null ? cellText(row, colSubcat)     : norm(row.dataset.folder); }
+      function getVis(row){ return colVisibility !== null ? cellText(row, colVisibility) : norm(row.dataset.visibility); }
+
+      // Normalize select option values to match normalized cell text
+      [categoryFilter, folderFilter, visibilityFilter].forEach(sel => {
+        if(!sel) return; Array.from(sel.options).forEach(opt => opt.value = norm(opt.value));
+      });
+
+      function applyFilters(){
+        const catV = norm(categoryFilter?.value);
+        const folV = norm(folderFilter?.value);
+        const visV = norm(visibilityFilter?.value);
+
+
+        rows().forEach((row, idx) => {
+          const cat = getCat(row);
+          const fol = getSub(row);
+          const vis = getVis(row);
+          const ok = (!catV || cat === catV) && (!folV || fol === folV) && (!visV || vis === visV);
+          row.style.display = ok ? 'table-row' : 'none';
+          if(idx < 5)
+        });
+      }
+
+      // Bind listeners + delegated fallback
+      ['change','input'].forEach(evt => {
+        categoryFilter?.addEventListener(evt, applyFilters);
+        folderFilter?.addEventListener(evt, applyFilters);
+        visibilityFilter?.addEventListener(evt, applyFilters);
+      });
+      document.addEventListener('change', function(e){
+        if(e.target === categoryFilter || e.target === folderFilter || e.target === visibilityFilter){
+
+          applyFilters();
         }
+      });
 
-        // Open rename category modal
-        renameCategoryBtn.addEventListener('click', function() {
-            const selectedCategory = categoryFilter.value;
-            if (!selectedCategory) {
-                alert('Please select a category to rename.');
-                return;
-            }
-
-            oldCategoryInput.value = selectedCategory;
-            newCategoryInput.value = '';
-            renameCategoryModal.style.display = 'block';
-        });
-
-        // Open rename subcategory modal
-        renameSubcategoryBtn.addEventListener('click', function() {
-            const selectedSubcategory = folderFilter.value;
-            if (!selectedSubcategory) {
-                alert('Please select a subcategory to rename.');
-                return;
-            }
-
-            oldSubcategoryInput.value = selectedSubcategory;
-            newSubcategoryInput.value = '';
-
-            // If a category is selected in the filter, pre-select it in the modal
-            categoryForSubcategorySelect.value = categoryFilter.value;
-
-            renameSubcategoryModal.style.display = 'block';
-        });
-
-        // Close modals
-        closeButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                renameCategoryModal.style.display = 'none';
-                renameSubcategoryModal.style.display = 'none';
-            });
-        });
-
-        // Handle rename category form submission
-        renameCategoryForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const oldCategory = oldCategoryInput.value;
-            const newCategory = newCategoryInput.value;
-
-            if (!oldCategory || !newCategory) {
-                alert('Both old and new category names are required.');
-                return;
-            }
-
-            // Send AJAX request to rename category
-            const formData = new FormData();
-            formData.append('old_category', oldCategory);
-            formData.append('new_category', newCategory);
-
-            fetch('/dashboard/rename_category', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    // Reload the page to update the category list
-                    window.location.reload();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while renaming the category.');
-            });
-        });
-
-        // Handle rename subcategory form submission
-        renameSubcategoryForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-
-            const oldSubcategory = oldSubcategoryInput.value;
-            const newSubcategory = newSubcategoryInput.value;
-            const category = categoryForSubcategorySelect.value;
-
-            if (!oldSubcategory || !newSubcategory) {
-                alert('Both old and new subcategory names are required.');
-                return;
-            }
-
-            // Send AJAX request to rename subcategory
-            const formData = new FormData();
-            formData.append('old_subcategory', oldSubcategory);
-            formData.append('new_subcategory', newSubcategory);
-            if (category) {
-                formData.append('category', category);
-            }
-
-            fetch('/dashboard/rename_subcategory', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    // Reload the page to update the subcategory list
-                    window.location.reload();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('An error occurred while renaming the subcategory.');
-            });
-        });
-
-        // Filter event listeners
-        categoryFilter.addEventListener('change', applyFilters);
-        folderFilter.addEventListener('change', applyFilters);
-        visibilityFilter.addEventListener('change', applyFilters);
+      // Initial run + expose for console testing
+      applyFilters();
+      window.__applyRefFilters = applyFilters;
     });
+  })();
 </script>
 {% endblock %}
